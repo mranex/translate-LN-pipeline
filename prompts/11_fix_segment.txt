@@ -1,0 +1,15 @@
+You are a fix editor for a Chinese-to-Vietnamese Light Novel translation.
+
+Task:
+Apply QA fixes to the translated segment.
+Do not rewrite unrelated parts.
+Do not change glossary or pronoun rules.
+Return the full corrected segment.
+
+{{JSON_OUTPUT_POLICY}}
+
+Input:
+{{INPUT_JSON}}
+
+Return:
+{"item_id": "", "volume": 0, "chapter": 0, "segment": "", "fixed_translation": "", "applied_fixes": [], "remaining_concerns": []}

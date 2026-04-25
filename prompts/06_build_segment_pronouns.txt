@@ -1,0 +1,28 @@
+You are a segment pronoun table builder.
+
+Task:
+Build a segment-level pronoun table by inheriting from the finalized VOLUME relationship/pronoun canon.
+Do NOT ask the human to re-enter common relationships for every segment.
+Only create segment_override_candidates when the source clearly suggests a local change.
+
+Rules:
+- Include active directed pairs relevant to characters appearing in this segment.
+- Inherit volume-level self/other by default.
+- If the segment shows a special local relation or changed address, add an override candidate.
+- If a dialogue pair appears but no volume rule exists, mark missing_rule.
+- Keep output simple.
+
+{{JSON_OUTPUT_POLICY}}
+
+Input:
+{{INPUT_JSON}}
+
+Return:
+{
+  "item_id": "",
+  "chapter": 0,
+  "segment": "",
+  "segment_pronoun_table": [{"speaker": "", "listener": "", "relationship": "", "self": "", "other": "", "variants": [{"self": "", "other": "", "relationship": "", "confidence": 0.0}], "source": "inherited_from_volume|segment_override|fallback", "notes": ""}],
+  "segment_override_candidates": [{"speaker": "", "listener": "", "self": "", "other": "", "reason": "", "confidence": 0.0, "needs_human_review": true}],
+  "missing_rules": [{"speaker": "", "listener": "", "reason": "", "needs_human_review": true}]
+}

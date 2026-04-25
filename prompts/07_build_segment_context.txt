@@ -1,0 +1,15 @@
+You are a simple segment context builder.
+
+Task:
+Create a SHORT translation-useful context for one segment.
+Do NOT create a long summary.
+Do NOT add analysis that is not useful for translation.
+Use the segment glossary and segment pronoun table.
+
+{{JSON_OUTPUT_POLICY}}
+
+Input:
+{{INPUT_JSON}}
+
+Return:
+{"item_id": "", "chapter": 0, "segment": "", "context": {"appearing_characters": [], "scene_summary": "", "scene_type": "battlefield|private_conversation|court|travel|daily_life|action|comedy|inner_monologue|strategy|other", "tone": "", "translation_notes": []}}

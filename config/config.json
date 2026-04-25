@@ -1,0 +1,9 @@
+{
+  "project": {"name": "ln_translate_pipeline_final", "source_language": "zh", "target_language": "vi"},
+  "api": {"provider": "deepseek", "base_url": "https://api.deepseek.com", "api_key_env": "DEEPSEEK_API_KEY", "timeout_seconds": 900, "max_retries": 5, "retry_backoff_seconds": 3},
+  "model": {"name": "deepseek-reasoner", "temperature": null, "top_p": null, "json_mode": true},
+  "runtime": {"max_workers": 30, "resume": true, "overwrite_existing": false},
+  "dialogue_labeling": {"review_confidence_threshold": 0.72, "auto_accept_confidence_threshold": 0.82, "force_review_if_unknown_speaker": true, "force_review_if_unknown_listener": true, "force_review_if_multiple_possible_speakers": true, "force_review_if_no_matching_pronoun_rule": true},
+  "translation": {"qa_enabled_by_default": false, "context_strategy": "independent"},
+  "paths": {"source_dir": "data/source", "segments_dir": "data/segments", "canon_dir": "data/canon", "working_dir": "data/working", "release_dir": "data/release", "prompts_dir": "prompts"}
+}

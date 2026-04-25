@@ -1,0 +1,7 @@
+Return strict JSON only.
+Do not include markdown.
+Do not wrap JSON in code fences.
+Do not include comments.
+Use null when unknown.
+Use [] for empty arrays.
+Confidence must be a number from 0 to 1.
