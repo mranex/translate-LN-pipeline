@@ -4,7 +4,7 @@ from __future__ import annotations
 import copy, json, re, shutil, sys, datetime as dt
 from pathlib import Path
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, simpledialog
 from tkinter.scrolledtext import ScrolledText
 
 APP='Manual Prompt Studio v2'
@@ -136,6 +136,7 @@ class Tab(ttk.Frame):
     def refresh(self):
         self.tree.delete(*self.tree.get_children()); q=self.q.get().strip(); first=None
         items=self.get_items()
+        old_cur_str = str(self.cur) if self.cur is not None else None
         for i,it in enumerate(items):
             if not contains(it,q): continue
             vals=[]
@@ -143,7 +144,9 @@ class Tab(ttk.Frame):
                 try: vals.append(compact(fn(it),140))
                 except Exception: vals.append('')
             self.tree.insert('', 'end', iid=str(i), values=vals); first=first or str(i)
-        if first is not None: self.tree.selection_set(first); self.load(int(first))
+        if old_cur_str is not None and self.tree.exists(old_cur_str):
+            self.tree.selection_set(old_cur_str); self.load(int(old_cur_str))
+        elif first is not None: self.tree.selection_set(first); self.load(int(first))
         else: self.cur=None; self.ed.delete('1.0',tk.END); self.label.config(text='No item selected')
     def sel(self,_=None):
         s=self.tree.selection()
@@ -172,13 +175,84 @@ class Tab(ttk.Frame):
         if not messagebox.askyesno(APP,f'Delete index {self.cur}?'): return
         del self.get_items()[self.cur]; self.dirty(); self.refresh()
 
+class TranslationsTab(ttk.Frame):
+    def __init__(self, parent, app):
+        super().__init__(parent)
+        self.app = app
+        self.rowconfigure(1, weight=1); self.columnconfigure(0, weight=1); self.columnconfigure(1, weight=2)
+        left = ttk.Frame(self); left.grid(row=0, column=0, rowspan=2, sticky='nsew', padx=4, pady=4)
+        left.rowconfigure(1, weight=1); left.columnconfigure(0, weight=1)
+        ttk.Label(left, text='Segments').grid(row=0, column=0, sticky='w')
+        self.listbox = tk.Listbox(left, bg=D['e'], fg=D['fg'], selectbackground=D['s'], font=('Consolas', 10))
+        self.listbox.grid(row=1, column=0, sticky='nsew')
+        self.listbox.bind('<<ListboxSelect>>', self.on_select)
+        right = ttk.Frame(self); right.grid(row=0, column=1, rowspan=2, sticky='nsew', padx=4, pady=4)
+        right.rowconfigure(1, weight=1); right.columnconfigure(0, weight=1)
+        bar = ttk.Frame(right); bar.grid(row=0, column=0, sticky='ew')
+        ttk.Button(bar, text='Save Translation', command=self.save_translation).pack(side='left', padx=2)
+        ttk.Button(bar, text='Quick Fix (AI)', style='Accent.TButton', command=self.quick_fix).pack(side='left', padx=2)
+        self.ed = ScrolledText(right, wrap=tk.WORD, undo=True, bg=D['e'], fg=D['fg'], insertbackground=D['fg'], selectbackground=D['s'], font=('Segoe UI', 11))
+        self.ed.grid(row=1, column=0, sticky='nsew')
+        self.items = []; self.cur_id = None
+    def refresh(self):
+        self.listbox.delete(0, tk.END); self.items = []
+        if not self.app.current: return
+        vol = self.app.vol()
+        draft = self.app.jsonl_map(self.app.ws.tr(vol))
+        fixed = self.app.jsonl_map(self.app.ws.fx(vol))
+        segs = self.app.ws.segments(vol)
+        for seg in segs:
+            sid = str(seg.get('segment'))
+            txt = (result(fixed.get(sid, {})).get('fixed_translation') or result(fixed.get(sid, {})).get('translation') or result(draft.get(sid, {})).get('translation') or '')
+            self.items.append((sid, txt))
+            self.listbox.insert(tk.END, sid + (' (*)' if txt else ''))
+    def on_select(self, e):
+        sel = self.listbox.curselection()
+        if not sel: return
+        self.cur_id, txt = self.items[sel[0]]
+        self.ed.delete('1.0', tk.END)
+        self.ed.insert('1.0', txt)
+    def save_translation(self):
+        if not self.cur_id: return
+        txt = self.ed.get('1.0', tk.END).strip()
+        self.app.imp_fix({'item_id': self.cur_id, 'fixed_translation': txt})
+        self.refresh()
+        messagebox.showinfo(APP, 'Saved to fixed translations.')
+    def quick_fix(self):
+        if not self.cur_id: return
+        try:
+            sel_first = self.ed.index(tk.SEL_FIRST)
+            sel_last = self.ed.index(tk.SEL_LAST)
+            highlighted = self.ed.get(sel_first, sel_last).strip()
+        except tk.TclError: messagebox.showerror(APP, 'Please highlight text to Quick Fix.'); return
+        if not highlighted: return
+        instruction = simpledialog.askstring('Quick Fix', 'Enter instruction (e.g. "make it more aggressive"):')
+        if not instruction: return
+        vol = self.app.vol()
+        seg_data = next((s for s in self.app.ws.segments(vol) if str(s.get('segment')) == self.cur_id), {})
+        dl = result(self.app.jsonl_map(self.app.ws.dl(vol)).get(self.cur_id, {}))
+        input_json = {'source_context': dl.get('labeled_source') or seg_data.get('content'), 'highlighted_translation_to_fix': highlighted, 'instruction': instruction}
+        base = self.app.ws.load_prompt('12_quick_fix.txt')
+        jp = self.app.ws.load_prompt('00_json_output_policy.txt') if self.app.ws.root.joinpath('prompts','00_json_output_policy.txt').exists() else ''
+        genre = self.app.load_config().get('genre','')
+        pr = base.replace('{{JSON_OUTPUT_POLICY}}', jp).replace('{{INPUT_JSON}}', pretty(input_json)).replace('{{genre}}', genre)
+        self.app.current_quick_fix_data = {'item_id': self.cur_id, 'sel_first': sel_first, 'sel_last': sel_last, 'highlighted': highlighted}
+        self.app.prompt.config(state=tk.NORMAL)
+        self.app.prompt.delete('1.0', tk.END)
+        self.app.prompt.insert('1.0', pr)
+        self.app.prompt.config(state=tk.DISABLED)
+        self.app.response.delete('1.0', tk.END)
+        self.app.clipboard_clear(); self.app.clipboard_append(pr)
+        messagebox.showinfo('Quick Fix', 'Prompt copied to clipboard. Paste response in the Response box and click Process Response.')
+
 class App(tk.Tk):
     def __init__(self,root_dir, project_name):
         super().__init__(); setup(self); self.title(APP + f' - {project_name}'); self.geometry('1600x920'); self.minsize(1200,720)
         self.ws=WS(root_dir, project_name); self.current=None; self.data={}; self.dirty=set()
         self.config=self.ws.load_config()
         self.build_ui(); self.build_steps(); self.bind('<Control-s>',lambda _e:self.save_all()); self.bind('<Control-r>',lambda _e:self.reload())
-        self.protocol('WM_DELETE_WINDOW',self.exit); self.reload()
+        self.protocol('WM_DELETE_WINDOW',self.exit)
+        self.tree.after(100, self.reload)
     def vol(self): return self.current.get('volume') if self.current else None
     def build_ui(self):
         self.rowconfigure(1,weight=1); self.columnconfigure(0,weight=1)
@@ -225,6 +299,8 @@ class App(tk.Tk):
         self.tabs['segment_pronouns']=Tab(self.nb,'Segment Pronouns',lambda:self.data.setdefault('segment_pronouns',[]),lambda:self.mark('segment_pronouns'),
             [('item','Item',110,iid),('status','Status',80,lambda x:x.get('status')),('segment','Segment',110,lambda x:result(x).get('segment')),('rules','Rules',60,lambda x:len(result(x).get('segment_pronoun_table',[]) or [])),('overrides','Overrides',70,lambda x:len(result(x).get('segment_override_candidates',[]) or [])),('missing','Missing',70,lambda x:len(result(x).get('missing_rules',[]) or []))])
         self.nb.add(self.tabs['segment_pronouns'],text='Segment Pronouns')
+        self.tabs['translations'] = TranslationsTab(self.nb, self)
+        self.nb.add(self.tabs['translations'], text='Translations')
         ref=ttk.Frame(self.nb); ref.rowconfigure(1,weight=1); ref.columnconfigure(0,weight=1); bar=ttk.Frame(ref); bar.grid(row=0,column=0,sticky='ew',padx=8,pady=(8,4)); bar.columnconfigure(0,weight=1)
         self.ref_path=tk.StringVar(); ttk.Entry(bar,textvariable=self.ref_path).grid(row=0,column=0,sticky='ew',padx=(0,6)); ttk.Button(bar,text='Open File...',command=self.open_ref).grid(row=0,column=1,padx=2); ttk.Button(bar,text='Reload',command=self.reload_ref).grid(row=0,column=2,padx=2)
         self.ref=ScrolledText(ref,wrap=tk.NONE,bg=D['e'],fg=D['fg'],insertbackground=D['fg'],selectbackground=D['s'],borderwidth=0,highlightthickness=1,highlightbackground=D['b'],font=('Consolas',10)); self.ref.grid(row=1,column=0,sticky='nsew',padx=8,pady=(4,8)); self.nb.add(ref,text='Reference')
@@ -236,9 +312,11 @@ class App(tk.Tk):
             Step('extract_chapter_relationships','Extract Chapter Relationships','chapter','04_extract_volume_relationships.txt',self.in_extract_ch_rel,self.imp_ch_rel),
             Step('merge_volume_relationships','Merge Volume Relationships','volume','05_merge_volume_relationships.txt',self.in_merge_vol_rel,self.imp_vol_rel),
             Step('review_volume_relationships','Review/Finalize Volume Relationships','volume',None,None,None,self.focus_r,'Use editor tab, then Approve Relationships'),
-            Step('build_segment_glossary','Build Segment Glossary','segment','03_build_segment_glossary.txt',self.in_seg_gloss,self.imp_seg_gloss),
+            Step('build_segment_glossary','Build Segment Glossary (AI)','segment','03_build_segment_glossary.txt',self.in_seg_gloss,self.imp_seg_gloss),
+            Step('build_segment_glossary_local','Build Segment Glossary (Local)','segment',None,None,None,self.build_sg_local,'Run local text matching to build segment glossary'),
             Step('review_segment_glossary','Review Segment Glossary','segment',None,None,None,self.focus_sg,'Inspect/edit imported row in Segment Glossaries tab'),
-            Step('build_segment_pronouns','Build Segment Pronouns','segment','06_build_segment_pronouns.txt',self.in_seg_pron,self.imp_seg_pron),
+            Step('build_segment_pronouns','Build Segment Pronouns (AI)','segment','06_build_segment_pronouns.txt',self.in_seg_pron,self.imp_seg_pron),
+            Step('build_segment_pronouns_local','Build Segment Pronouns (Local)','segment',None,None,None,self.build_sp_local,'Run local text matching to build segment pronouns'),
             Step('review_segment_pronouns','Review Segment Pronouns','segment',None,None,None,self.focus_sp,'Inspect/edit imported row in Segment Pronouns tab'),
             Step('build_segment_context','Build Segment Context','segment','07_build_segment_context.txt',self.in_seg_ctx,self.imp_seg_ctx),
             Step('label_dialogue','Label Dialogue','segment','08_label_dialogue.txt',self.in_label,self.imp_label),
@@ -250,8 +328,8 @@ class App(tk.Tk):
     def open_root(self):
         p=filedialog.askdirectory(title='Select project root')
         if p: self.ws=WS(p); self.root_label.config(text=str(self.ws.root)); self.reload()
-    def build_tree(self):
-        self.tree.delete(*self.tree.get_children()); source_dir=self.ws.p('data','source')
+    def build_tree(self, preserve_id=None):
+        self.tree.delete(*self.tree.get_children()); source_dir=self.ws.p('source')
         if not source_dir.exists(): return
         for vp in sorted(source_dir.glob('volume_*.json')):
             m=re.search(r'volume_(\d+)\.json',vp.name)
@@ -265,7 +343,11 @@ class App(tk.Tk):
             for seg in self.ws.segments(v):
                 c=int(seg.get('chapter',0)); sid=f'{vid}:segment:{seg.get("segment")}'; self.tree.insert(cids.get(c,vid),'end',iid=sid,text=f'Segment {seg.get("segment")}')
         children=self.tree.get_children()
-        if children: self.tree.selection_set(children[0]); self.on_tree()
+        if preserve_id and self.tree.exists(preserve_id):
+            self.tree.selection_set(preserve_id)
+            self.tree.see(preserve_id)
+            self.on_tree()
+        elif children: self.tree.selection_set(children[0]); self.on_tree()
     def parse_node(self,i):
         p=i.split(':'); node={'type':'unknown'}
         if len(p)>=2 and p[0]=='volume':
@@ -335,6 +417,22 @@ class App(tk.Tk):
         except Exception as e: messagebox.showerror(APP,f'Invalid JSON response:\n{e}'); return
         self.response.delete('1.0',tk.END); self.response.insert('1.0',pretty(o)); self.status.set('Response validated.')
     def import_resp(self):
+        if getattr(self, 'current_quick_fix_data', None):
+            t = self.response.get('1.0', tk.END).strip()
+            if not t: return
+            try:
+                o = parse_json_response(t)
+                new_text = o.get('new_translation_snippet', '')
+                if not new_text: raise ValueError('Missing new_translation_snippet')
+                tab = self.tabs.get('translations')
+                if tab and tab.cur_id == self.current_quick_fix_data['item_id']:
+                    tab.ed.delete(self.current_quick_fix_data['sel_first'], self.current_quick_fix_data['sel_last'])
+                    tab.ed.insert(self.current_quick_fix_data['sel_first'], new_text)
+                    messagebox.showinfo('Quick Fix', 'Translation updated! Click Save Translation when done.')
+                self.current_quick_fix_data = None
+                self.status.set('Quick Fix applied.')
+            except Exception as e: messagebox.showerror(APP, f'Quick Fix failed:\n{e}')
+            return
         st=self.selected_step()
         if not st or not st.importer or st.id not in self.config.get('enabled_steps', []): return
         t=self.response.get('1.0',tk.END).strip()
@@ -357,6 +455,49 @@ class App(tk.Tk):
         for seg in self.ws.segments(self.vol()):
             if str(seg.get('segment'))==self.current['segment']: return seg
     def jsonl_map(self,p): return self.ws.map_jsonl(p)
+    def build_sg_local(self):
+        c = self.current
+        if not c or c.get('type') != 'segment': messagebox.showerror(APP, 'Please select a segment.'); return
+        vol = c.get('volume'); item_id = item_id_from_record(self.segment_rec()); seg_id = c.get('segment')
+        vg = self.data.get('glossary', {}).get('volume_merge_glossary', [])
+        if not vg: messagebox.showwarning(APP, 'Volume glossary is empty.'); return
+        seg_data = self.segment_rec()
+        if not seg_data: return
+        content = seg_data.get('content', '')
+        sg = []
+        for term in vg:
+            src = term.get('source', '')
+            if src and src in content:
+                sg.append({'id': term.get('id', ''), 'source': src, 'vi': term.get('vi', ''), 'type': term.get('type', ''), 'status': term.get('status', 'tentative'), 'notes': term.get('notes', '')})
+        res = {'item_id': item_id, 'chapter': seg_data.get('chapter', 0), 'segment': seg_id, 'segment_glossary': sg, 'missing_glossary_candidates': []}
+        self.imp_seg_gloss(res)
+        self.reload(); self.status.set(f'Local segment glossary built with {len(sg)} terms.')
+    def build_sp_local(self):
+        c = self.current
+        if not c or c.get('type') != 'segment': messagebox.showerror(APP, 'Please select a segment.'); return
+        vol = c.get('volume'); item_id = item_id_from_record(self.segment_rec()); seg_id = c.get('segment')
+        vg = self.data.get('glossary', {}).get('volume_merge_glossary', [])
+        vr = self.data.get('relationships', {}).get('relationship_pronoun_canon', [])
+        seg_data = self.segment_rec()
+        if not seg_data: return
+        content = seg_data.get('content', '')
+        present_chars = set()
+        for term in vg:
+            if term.get('type') in ['character', 'alias', 'title', 'epithet']:
+                src = term.get('source', '')
+                if src and src in content:
+                    present_chars.add(term.get('vi', '')); present_chars.add(term.get('source', '')); present_chars.add(term.get('id', ''))
+        sp = []
+        for rel in vr:
+            spk = rel.get('speaker')
+            lsn = rel.get('listener')
+            spk_in = (spk in present_chars) or (spk in ['UNKNOWN', 'GROUP'])
+            lsn_in = (lsn in present_chars) or (lsn in ['UNKNOWN', 'GROUP', 'self', 'SELF'])
+            if spk_in and lsn_in:
+                sp.append({'speaker': spk, 'listener': lsn, 'relationship': rel.get('relationship', ''), 'self': rel.get('self', ''), 'other': rel.get('other', ''), 'variants': rel.get('variants', []), 'source': 'inherited_from_volume', 'notes': rel.get('notes', '')})
+        res = {'item_id': item_id, 'chapter': seg_data.get('chapter', 0), 'segment': seg_id, 'segment_pronoun_table': sp, 'segment_override_candidates': [], 'missing_rules': []}
+        self.imp_seg_pron(res)
+        self.reload(); self.status.set(f'Local segment pronouns built with {len(sp)} rules.')
     # input builders
     def base_ch(self):
         ch=self.chapter_rec()
@@ -462,7 +603,9 @@ class App(tk.Tk):
             except Exception: pass
         self.ref.delete('1.0',tk.END); self.ref.insert('1.0',txt)
     def reload(self):
-        self.root_label.config(text=str(self.ws.root)); self.load_artifacts(); self.build_tree(); self.refresh_tabs(); self.status.set('Workspace reloaded.')
+        old_sel = self.tree.selection()
+        old_id = old_sel[0] if old_sel else None
+        self.root_label.config(text=str(self.ws.root)); self.load_artifacts(); self.build_tree(old_id); self.refresh_tabs(); self.status.set('Workspace reloaded.')
     def exit(self):
         if self.dirty:
             a=messagebox.askyesnocancel(APP,'Save editor changes before exit?')

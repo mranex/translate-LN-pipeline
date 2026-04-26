@@ -15,6 +15,7 @@ Do NOT force segment-specific changes into volume default.
 
 When different chapters suggest different Vietnamese renderings for the same source item, group them as variants.
 If a pair has conflicting evidence, keep variants.
+Ensure that "self" pairs (where `listener` is "self") are preserved and merged correctly. These are critical for internal monologues.
 
 Status rules:
 - confirmed: The relationship between the two characters is confirmed.

@@ -16,6 +16,7 @@ For each directed pair A -> B, extract:
 
 Important:
 - Directed pairs matter. A -> B and B -> A are different.
+- MUST extract internal monologue/self-reference pairs where `listener` is "self" (e.g. `speaker` = "CharacterName", `listener` = "self"). This represents how the character refers to themselves in thoughts or when no specific listener is present.
 - This is volume-level default canon. Segment-level overrides will be handled later.
 - Do not infer "anh/em" from gender or romance potential.
 - Adapt pronouns according to the Context/Genre provided above.
