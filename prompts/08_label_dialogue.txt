@@ -1,5 +1,8 @@
 You are a dialogue attribution assistant.
 
+Context/Genre:
+{{genre}}
+
 Task:
 Label ONLY dialogue lines in the source segment with speaker/listener tags.
 Do NOT translate.
@@ -45,13 +48,6 @@ Label format examples:
 [Elen -> GROUP | confidence=0.80]: source dialogue
 [UNKNOWN -> UNKNOWN | confidence=0.42]: source dialogue
 
-Review policy:
-- Mark review_required=true if confidence < review_confidence_threshold.
-- Mark review_required=true for UNKNOWN speaker/listener.
-- Mark review_required=true when multiple possible speakers exist.
-- Mark review_required=true when no matching pronoun rule exists.
-- Do not be too conservative with confidence. Use medium-high thresholds honestly.
-
 {{JSON_OUTPUT_POLICY}}
 
 Input:
@@ -72,14 +68,12 @@ Return:
       "listener": null,
       "matching_pronoun_rule": null,
       "confidence": 0.0,
-      "review_required": false,
       "reason": ""
     }
   ],
   "label_report": {
     "low_confidence_units": [],
     "unknown_units": [],
-    "missing_pronoun_rule_units": [],
-    "human_review_required": false
+    "missing_pronoun_rule_units": []
   }
 }

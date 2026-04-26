@@ -181,7 +181,7 @@ class ReleaseBuilderApp:
 
         row1 = ttk.Frame(main)
         row1.pack(fill="x", pady=(0, 10))
-        ttk.Label(row1, text="Project Root:").pack(side="left")
+        ttk.Label(row1, text="Project Folder (data/tên_project):").pack(side="left")
         ttk.Entry(row1, textvariable=self.project_root).pack(side="left", fill="x", expand=True, padx=10)
         ttk.Button(row1, text="Chọn...", command=self.choose_project_root).pack(side="left")
 
@@ -262,10 +262,10 @@ class ReleaseBuilderApp:
         self.log_box.pack(fill="both", expand=True, pady=(5, 0))
 
     def choose_project_root(self) -> None:
-        folder = filedialog.askdirectory(title="Chọn project root của pipeline")
+        folder = filedialog.askdirectory(title="Chọn Project Folder (ví dụ: data/my_project)")
         if folder:
             self.project_root.set(folder)
-            self.log(f"Đã chọn project root: {folder}")
+            self.log(f"Đã chọn project folder: {folder}")
 
     def choose_output_dir(self) -> None:
         folder = filedialog.askdirectory(title="Chọn thư mục output")
@@ -337,9 +337,9 @@ class ReleaseBuilderApp:
         root = self.get_project_root()
         v = self.volume_num()
         return {
-            "segments": root / "data" / "segments" / f"volume_{v:02d}.segments.json",
-            "draft": root / "data" / "working" / "translations" / "draft" / f"volume_{v:02d}.translated.jsonl",
-            "fixed": root / "data" / "working" / "translations" / "fixed" / f"volume_{v:02d}.fixed.jsonl",
+            "segments": root / "segments" / f"volume_{v:02d}.segments.json",
+            "draft": root / "working" / "translations" / "draft" / f"volume_{v:02d}.translated.jsonl",
+            "fixed": root / "working" / "translations" / "fixed" / f"volume_{v:02d}.fixed.jsonl",
         }
 
     def choose_translation_map(self, paths: dict[str, Path]) -> tuple[str, dict[str, str]]:

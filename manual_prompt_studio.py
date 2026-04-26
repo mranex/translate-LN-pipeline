@@ -72,36 +72,42 @@ def setup(root):
     st.configure('Treeview.Heading',background=D['p'],foreground=D['fg'],relief='flat')
 
 class WS:
-    def __init__(self,root): self.root=Path(root)
-    def p(self,*x): return self.root.joinpath(*x)
-    def load_prompt(self,name): return self.p('prompts',name).read_text(encoding='utf-8')
+    def __init__(self,root,project_name): 
+        self.root=Path(root)
+        self.project_name=project_name
+    def p(self,*x): return self.root.joinpath('data',self.project_name,*x)
+    def config_path(self): return self.p('project_config.json')
+    def load_config(self): return read_json(self.config_path(), {'name':self.project_name, 'genre':'', 'level':'Heavy', 'enabled_steps':[]})
+    def save_config(self, cfg): write_json(self.config_path(), cfg)
+    def load_prompt(self,name): return self.root.joinpath('prompts',name).read_text(encoding='utf-8')
     def render(self,name,input_obj):
         base=self.load_prompt(name)
-        jp=self.load_prompt('00_json_output_policy.txt') if self.p('prompts','00_json_output_policy.txt').exists() else ''
-        return base.replace('{{JSON_OUTPUT_POLICY}}',jp).replace('{{INPUT_JSON}}',pretty(input_obj))
-    def source(self,v): return self.p('data','source',f'volume_{v:02d}.json')
-    def segs(self,v): return self.p('data','segments',f'volume_{v:02d}.segments.json')
+        jp=self.load_prompt('00_json_output_policy.txt') if self.root.joinpath('prompts','00_json_output_policy.txt').exists() else ''
+        genre=self.load_config().get('genre','')
+        return base.replace('{{JSON_OUTPUT_POLICY}}',jp).replace('{{INPUT_JSON}}',pretty(input_obj)).replace('{{genre}}',genre)
+    def source(self,v): return self.p('source',f'volume_{v:02d}.json')
+    def segs(self,v): return self.p('segments',f'volume_{v:02d}.segments.json')
     def chapters(self,v):
         d=read_json(self.source(v),[])
         return d.get('chapters',[]) if isinstance(d,dict) else d
     def segments(self,v):
         d=read_json(self.segs(v),[])
         return d.get('segments',[]) if isinstance(d,dict) else d
-    def g_draft(self,v): return self.p('data','canon','glossary','drafts',f'volume_{v:02d}.glossary.draft.json')
-    def g_final(self,v): return self.p('data','canon','glossary','finalized',f'volume_{v:02d}.glossary.json')
-    def r_draft(self,v): return self.p('data','canon','relationships','drafts',f'volume_{v:02d}.relationships.draft.json')
-    def r_final(self,v): return self.p('data','canon','relationships','finalized',f'volume_{v:02d}.relationships.json')
-    def ge(self,v): return self.p('data','working','glossary_extractions',f'volume_{v:02d}.glossary_extractions.jsonl')
-    def re(self,v): return self.p('data','working','relationship_extractions',f'volume_{v:02d}.relationships_extractions.jsonl')
-    def sg(self,v): return self.p('data','working','segment_glossaries',f'volume_{v:02d}.segment_glossaries.jsonl')
-    def sp(self,v): return self.p('data','canon','segment_pronouns',f'volume_{v:02d}.segment_pronouns.jsonl')
-    def sc(self,v): return self.p('data','working','segment_contexts',f'volume_{v:02d}.segment_contexts.jsonl')
-    def dl(self,v): return self.p('data','working','dialogue_labels',f'volume_{v:02d}.dialogue_labels.jsonl')
-    def tr(self,v): return self.p('data','working','translations','draft',f'volume_{v:02d}.translated.jsonl')
-    def qa(self,v): return self.p('data','working','translations','qa',f'volume_{v:02d}.qa.jsonl')
-    def fx(self,v): return self.p('data','working','translations','fixed',f'volume_{v:02d}.fixed.jsonl')
-    def rel_json(self,v): return self.p('data','release',f'volume_{v:02d}.vi.json')
-    def rel_md(self,v): return self.p('data','release',f'volume_{v:02d}.vi.md')
+    def g_draft(self,v): return self.p('canon','glossary','drafts',f'volume_{v:02d}.glossary.draft.json')
+    def g_final(self,v): return self.p('canon','glossary','finalized',f'volume_{v:02d}.glossary.json')
+    def r_draft(self,v): return self.p('canon','relationships','drafts',f'volume_{v:02d}.relationships.draft.json')
+    def r_final(self,v): return self.p('canon','relationships','finalized',f'volume_{v:02d}.relationships.json')
+    def ge(self,v): return self.p('working','glossary_extractions',f'volume_{v:02d}.glossary_extractions.jsonl')
+    def re(self,v): return self.p('working','relationship_extractions',f'volume_{v:02d}.relationships_extractions.jsonl')
+    def sg(self,v): return self.p('working','segment_glossaries',f'volume_{v:02d}.segment_glossaries.jsonl')
+    def sp(self,v): return self.p('canon','segment_pronouns',f'volume_{v:02d}.segment_pronouns.jsonl')
+    def sc(self,v): return self.p('working','segment_contexts',f'volume_{v:02d}.segment_contexts.jsonl')
+    def dl(self,v): return self.p('working','dialogue_labels',f'volume_{v:02d}.dialogue_labels.jsonl')
+    def tr(self,v): return self.p('working','translations','draft',f'volume_{v:02d}.translated.jsonl')
+    def qa(self,v): return self.p('working','translations','qa',f'volume_{v:02d}.qa.jsonl')
+    def fx(self,v): return self.p('working','translations','fixed',f'volume_{v:02d}.fixed.jsonl')
+    def rel_json(self,v): return self.p('release',f'volume_{v:02d}.vi.json')
+    def rel_md(self,v): return self.p('release',f'volume_{v:02d}.vi.md')
     def map_jsonl(self,p): return {iid(r):r for r in read_jsonl(p)}
 
 class Step:
@@ -167,9 +173,10 @@ class Tab(ttk.Frame):
         del self.get_items()[self.cur]; self.dirty(); self.refresh()
 
 class App(tk.Tk):
-    def __init__(self,root_dir):
-        super().__init__(); setup(self); self.title(APP); self.geometry('1600x920'); self.minsize(1200,720)
-        self.ws=WS(root_dir); self.current=None; self.data={}; self.dirty=set()
+    def __init__(self,root_dir, project_name):
+        super().__init__(); setup(self); self.title(APP + f' - {project_name}'); self.geometry('1600x920'); self.minsize(1200,720)
+        self.ws=WS(root_dir, project_name); self.current=None; self.data={}; self.dirty=set()
+        self.config=self.ws.load_config()
         self.build_ui(); self.build_steps(); self.bind('<Control-s>',lambda _e:self.save_all()); self.bind('<Control-r>',lambda _e:self.reload())
         self.protocol('WM_DELETE_WINDOW',self.exit); self.reload()
     def vol(self): return self.current.get('volume') if self.current else None
@@ -188,10 +195,13 @@ class App(tk.Tk):
         self.step_list=tk.Listbox(ct,height=7,bg=D['e'],fg=D['fg'],selectbackground=D['s'],selectforeground=D['fg']); self.step_list.grid(row=1,column=0,sticky='nsew',padx=(8,4),pady=(4,8)); self.step_list.bind('<<ListboxSelect>>',self.on_step)
         rt=ttk.Frame(ct); rt.grid(row=1,column=1,sticky='nsew',padx=(4,8),pady=(4,8)); rt.columnconfigure(0,weight=1); rt.rowconfigure(2,weight=1)
         self.step_meta=ttk.Label(rt,text='No step selected',style='Muted.TLabel',justify='left'); self.step_meta.grid(row=0,column=0,sticky='w')
-        bar=ttk.Frame(rt); bar.grid(row=1,column=0,sticky='ew',pady=(4,4))
+        self.step_enabled_var = tk.BooleanVar()
+        self.step_enabled_cb = ttk.Checkbutton(rt, text='Enable this step for the current project', variable=self.step_enabled_var, command=self.toggle_step)
+        self.step_enabled_cb.grid(row=1, column=0, sticky='w', pady=(2, 4))
+        bar=ttk.Frame(rt); bar.grid(row=2,column=0,sticky='ew',pady=(4,4))
         ttk.Button(bar,text='Generate Prompt',command=self.gen).pack(side='left',padx=2); ttk.Button(bar,text='Copy Prompt',command=self.copy_prompt).pack(side='left',padx=2); ttk.Button(bar,text='Validate Response',command=self.validate_response).pack(side='left',padx=2)
         ttk.Button(bar,text='Import Response',style='Accent.TButton',command=self.import_resp).pack(side='left',padx=2); ttk.Button(bar,text='Run Local',style='Ok.TButton',command=self.run_local).pack(side='left',padx=2)
-        self.prompt=ScrolledText(rt,wrap=tk.WORD,undo=True,bg=D['e'],fg=D['fg'],insertbackground=D['fg'],selectbackground=D['s'],borderwidth=0,highlightthickness=1,highlightbackground=D['b'],font=('Consolas',10)); self.prompt.grid(row=2,column=0,sticky='nsew')
+        self.prompt=ScrolledText(rt,wrap=tk.WORD,undo=True,bg=D['e'],fg=D['fg'],insertbackground=D['fg'],selectbackground=D['s'],borderwidth=0,highlightthickness=1,highlightbackground=D['b'],font=('Consolas',10)); self.prompt.grid(row=3,column=0,sticky='nsew')
         cb=ttk.Frame(center); cb.columnconfigure(0,weight=1); cb.rowconfigure(1,weight=1); ttk.Label(cb,text='Paste Response JSON',style='Muted.TLabel').grid(row=0,column=0,sticky='w',padx=8,pady=(8,4))
         self.response=ScrolledText(cb,wrap=tk.WORD,undo=True,bg=D['e'],fg=D['fg'],insertbackground=D['fg'],selectbackground=D['s'],borderwidth=0,highlightthickness=1,highlightbackground=D['b'],font=('Consolas',10)); self.response.grid(row=1,column=0,sticky='nsew',padx=8,pady=(4,8))
         center.add(ct,weight=3); center.add(cb,weight=2)
@@ -202,8 +212,8 @@ class App(tk.Tk):
     def build_tabs(self):
         self.tabs={}
         self.tabs['glossary']=Tab(self.nb,'Volume Glossary',lambda:self.data.setdefault('glossary',{}).setdefault('volume_merge_glossary',[]),lambda:self.mark('glossary'),
-            [('source','Source',150,lambda x:x.get('source')),('vi','Vietnamese',160,lambda x:x.get('vi')),('type','Type',110,lambda x:x.get('type')),('status','Status',90,lambda x:x.get('status')),('variants','Variants',80,lambda x:len(x.get('variants',[]) or [])),('notes','Notes',220,lambda x:x.get('notes'))],
-            True,lambda:{'id':'','source':'','vi':'','type':'other','status':'tentative','aliases':[],'variants':[],'forbidden_translations':[],'notes':'','appears_in':[],'needs_human_review':True})
+            [('source','Source',150,lambda x:x.get('source')),('vi','Vietnamese',160,lambda x:x.get('vi')),('type','Type',110,lambda x:x.get('type')),('status','Status',90,lambda x:x.get('status')),('notes','Notes',300,lambda x:x.get('notes'))],
+            True,lambda:{'id':'','source':'','vi':'','type':'other','status':'tentative','notes':''})
         self.nb.add(self.tabs['glossary'],text='Volume Glossary')
         self.tabs['relationships']=Tab(self.nb,'Volume Relationships',lambda:self.data.setdefault('relationships',{}).setdefault('relationship_pronoun_canon',[]),lambda:self.mark('relationships'),
             [('speaker','Speaker',120,lambda x:x.get('speaker')),('listener','Listener',120,lambda x:x.get('listener')),('rel','Relationship',210,lambda x:x.get('relationship')),('self','Self',70,lambda x:x.get('self')),('other','Other',70,lambda x:x.get('other')),('variants','Variants',80,lambda x:len(x.get('variants',[]) or [])),('status','Status',90,lambda x:x.get('status')),('notes','Notes',220,lambda x:x.get('notes'))],
@@ -281,16 +291,34 @@ class App(tk.Tk):
         if not s: return None
         lst=[x for x in self.steps if x.scope==self.current.get('type')]
         return lst[s[0]] if s[0]<len(lst) else None
+    def toggle_step(self):
+        st=self.selected_step()
+        if not st: return
+        en = self.step_enabled_var.get()
+        if en and st.id not in self.config.setdefault('enabled_steps', []):
+            self.config['enabled_steps'].append(st.id)
+            self.ws.save_config(self.config)
+        elif not en and st.id in self.config.setdefault('enabled_steps', []):
+            self.config['enabled_steps'].remove(st.id)
+            self.ws.save_config(self.config)
+        self.on_step()
+
     def on_step(self,_=None):
         st=self.selected_step()
         if not st: self.step_meta.config(text='No step selected'); return
+        is_en = st.id in self.config.get('enabled_steps', [])
+        self.step_enabled_var.set(is_en)
+        if not is_en:
+            self.step_meta.config(text=f"Step: {st.label}\n[DISABLED - Tick checkbox to enable]")
+            self.prompt.delete('1.0',tk.END)
+            return
         txt=[f"Step: {st.label}"]; 
         if st.prompt: txt.append(f"Prompt: {st.prompt}")
         if st.desc: txt.append(st.desc)
         self.step_meta.config(text='\n'.join(txt))
     def gen(self):
         st=self.selected_step()
-        if not st: return
+        if not st or st.id not in self.config.get('enabled_steps', []): return
         if st.local and not st.prompt:
             self.prompt.delete('1.0',tk.END); self.prompt.insert('1.0',f'[LOCAL ACTION]\n{st.desc or st.label}'); return
         try: inp=st.build(); pr=self.ws.render(st.prompt,inp)
@@ -308,7 +336,7 @@ class App(tk.Tk):
         self.response.delete('1.0',tk.END); self.response.insert('1.0',pretty(o)); self.status.set('Response validated.')
     def import_resp(self):
         st=self.selected_step()
-        if not st or not st.importer: return
+        if not st or not st.importer or st.id not in self.config.get('enabled_steps', []): return
         t=self.response.get('1.0',tk.END).strip()
         if not t: return
         try: o=parse_json_response(t); st.importer(o)
@@ -316,7 +344,7 @@ class App(tk.Tk):
         self.reload(); self.status.set(f'Imported response for {st.label}')
     def run_local(self):
         st=self.selected_step()
-        if not st or not st.local: return
+        if not st or not st.local or st.id not in self.config.get('enabled_steps', []): return
         try: st.local()
         except Exception as e: messagebox.showerror(APP,f'Local action failed:\n{e}'); return
         self.reload()
@@ -442,10 +470,69 @@ class App(tk.Tk):
             if a: self.save_all()
         self.destroy()
 
+class StartupApp(tk.Tk):
+    def __init__(self, root_dir):
+        super().__init__(); setup(self); self.title('Select Project'); self.geometry('600x400'); self.minsize(600,400)
+        self.root_dir = Path(root_dir)
+        self.selected_project = None
+        self.build_ui()
+    def build_ui(self):
+        self.columnconfigure(0, weight=1)
+        ttk.Label(self, text='Manual Prompt Studio - Project Selection', font=('Segoe UI',14,'bold')).grid(row=0, column=0, pady=20)
+        f = ttk.Frame(self); f.grid(row=1, column=0, sticky='nsew', padx=40); f.columnconfigure(1, weight=1)
+        ttk.Label(f, text='Existing Projects:').grid(row=0, column=0, sticky='w', pady=(0,5))
+        self.proj_combo = ttk.Combobox(f, state='readonly')
+        self.proj_combo.grid(row=0, column=1, sticky='ew', pady=(0,5))
+        data_dir = self.root_dir.joinpath('data')
+        projs = []
+        if data_dir.exists():
+            projs = [d.name for d in data_dir.iterdir() if d.is_dir() and d.name not in ('source', 'segments')]
+        self.proj_combo['values'] = projs
+        if projs: self.proj_combo.current(0)
+        ttk.Button(f, text='Load Project', style='Accent.TButton', command=self.load_proj).grid(row=0, column=2, padx=5, pady=(0,5))
+        ttk.Separator(f, orient='horizontal').grid(row=1, column=0, columnspan=3, sticky='ew', pady=20)
+        ttk.Label(f, text='Create New Project:', font=('Segoe UI', 12, 'bold')).grid(row=2, column=0, columnspan=3, sticky='w', pady=(0,10))
+        ttk.Label(f, text='Project Name:').grid(row=3, column=0, sticky='w', pady=5)
+        self.new_name = tk.StringVar()
+        ttk.Entry(f, textvariable=self.new_name).grid(row=3, column=1, columnspan=2, sticky='ew', pady=5)
+        ttk.Label(f, text='Genre:').grid(row=4, column=0, sticky='w', pady=5)
+        self.new_genre = tk.StringVar(value='Fantasy / Adventure')
+        ttk.Entry(f, textvariable=self.new_genre).grid(row=4, column=1, columnspan=2, sticky='ew', pady=5)
+        ttk.Label(f, text='Level:').grid(row=5, column=0, sticky='w', pady=5)
+        self.new_level = tk.StringVar(value='Heavy')
+        ttk.Combobox(f, textvariable=self.new_level, values=['Heavy', 'Medium', 'Lite'], state='readonly').grid(row=5, column=1, columnspan=2, sticky='ew', pady=5)
+        ttk.Button(f, text='Create Project', style='Ok.TButton', command=self.create_proj).grid(row=6, column=1, pady=20)
+    def load_proj(self):
+        val = self.proj_combo.get()
+        if not val: return
+        self.selected_project = val
+        self.destroy()
+    def create_proj(self):
+        name = self.new_name.get().strip()
+        if not name: messagebox.showerror('Error', 'Project Name is required'); return
+        if name in ('source', 'segments'): messagebox.showerror('Error', 'Invalid Project Name'); return
+        lvl = self.new_level.get()
+        steps = []
+        if lvl == 'Heavy':
+            steps = ['extract_chapter_glossary', 'merge_volume_glossary', 'review_volume_glossary', 'extract_chapter_relationships', 'merge_volume_relationships', 'review_volume_relationships', 'build_segment_glossary', 'review_segment_glossary', 'build_segment_pronouns', 'review_segment_pronouns', 'build_segment_context', 'label_dialogue', 'translate', 'qa', 'fix', 'assemble']
+        else: # Medium / Lite
+            steps = ['extract_chapter_glossary', 'merge_volume_glossary', 'review_volume_glossary', 'extract_chapter_relationships', 'merge_volume_relationships', 'review_volume_relationships', 'label_dialogue', 'translate', 'assemble']
+        cfg = {'name': name, 'genre': self.new_genre.get().strip(), 'level': lvl, 'enabled_steps': steps}
+        cfg_path = self.root_dir.joinpath('data', name, 'project_config.json')
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(cfg_path, cfg)
+        self.selected_project = name
+        self.destroy()
+
 def main():
     root=Path.cwd()
     if len(sys.argv)>1:
         p=Path(sys.argv[1])
         if p.exists() and p.is_dir(): root=p
-    app=App(root); app.mainloop()
+    startup = StartupApp(root)
+    startup.mainloop()
+    if startup.selected_project:
+        app=App(root, startup.selected_project)
+        app.mainloop()
+
 if __name__=='__main__': main()

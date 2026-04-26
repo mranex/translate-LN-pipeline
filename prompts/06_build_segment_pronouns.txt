@@ -1,5 +1,8 @@
 You are a segment pronoun table builder.
 
+Context/Genre:
+{{genre}}
+
 Task:
 Build a segment-level pronoun table by inheriting from the finalized VOLUME relationship/pronoun canon.
 Do NOT ask the human to re-enter common relationships for every segment.
@@ -23,6 +26,6 @@ Return:
   "chapter": 0,
   "segment": "",
   "segment_pronoun_table": [{"speaker": "", "listener": "", "relationship": "", "self": "", "other": "", "variants": [{"self": "", "other": "", "relationship": "", "confidence": 0.0}], "source": "inherited_from_volume|segment_override|fallback", "notes": ""}],
-  "segment_override_candidates": [{"speaker": "", "listener": "", "self": "", "other": "", "reason": "", "confidence": 0.0, "needs_human_review": true}],
-  "missing_rules": [{"speaker": "", "listener": "", "reason": "", "needs_human_review": true}]
+  "segment_override_candidates": [{"speaker": "", "listener": "", "self": "", "other": "", "reason": "", "confidence": 0.0}],
+  "missing_rules": [{"speaker": "", "listener": "", "reason": ""}]
 }
