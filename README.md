@@ -1,204 +1,169 @@
-# Light Novel CN→VI Manual Prompt Pipeline — Final Knowledge Handoff
+# Translate LN Pipeline
 
-Tài liệu này tổng hợp toàn bộ tri thức, quyết định thiết kế, workflow và các công cụ đã được hình thành trong quá trình xây dựng pipeline dịch Light Novel từ bản Trung sang tiếng Việt.
+Pipeline Python hỗ trợ dịch Light Novel từ tiếng Trung sang tiếng Việt bằng chuỗi prompt có output JSON cố định.
 
-Mục tiêu của tài liệu này là để có thể **chuyển sang một phiên làm việc mới hoàn toàn** mà vẫn giữ đầy đủ bối cảnh: vì sao pipeline cũ thất bại, bản final hoạt động theo nguyên tắc nào, manual workflow dùng ra sao, và các file/tool nào đang đảm nhiệm phần nào.
+Repo hiện có ba entry point chính:
 
----
+* `manual_prompt_studio.py`: GUI Tkinter để tạo prompt thủ công, copy sang chat model, paste JSON response về app và lưu artifact.
+* `python -m src.main ...`: CLI/API pipeline dùng OpenAI-compatible client.
+* `release_builder.py`: GUI Tkinter để ghép bản dịch theo segment thành JSON, HTML và EPUB.
 
-# 1. Bối cảnh dự án
-
-Mục tiêu là dịch một series Light Novel dài nhiều volume từ bản dịch tiếng Trung sang tiếng Việt.
-
-Đặc điểm source:
-
-- Source là bản Trung đã được dịch thủ công từ Nhật, chất lượng tốt.
-- Bối cảnh truyện là fantasy trung cổ châu Âu.
-- Tên nhân vật nên ưu tiên romanization / tên phương Tây / tên canon fandom nếu đã biết.
-- Danh hiệu, biệt danh, chiêu thức, vũ khí, tổ chức, khái niệm đặc thù có thể dùng Hán-Việt.
-- Cần tránh văn phong cổ trang Trung, tu tiên, kiếm hiệp, cung đấu nếu source không có.
-- Bản dịch mong muốn là Light Novel tiếng Việt tự nhiên, dễ đọc, không quá hiện đại, không slang mạng.
-
-Các vấn đề từng gặp:
-
-- Xưng hô nhân vật loạn giữa các chương/segment.
-- Narrator gọi cùng một nhân vật lúc thì “cậu ấy”, lúc “anh ấy”, lúc “ông ấy”.
-- Model tự đoán speaker/listener trong thoại không có chủ ngữ.
-- QA/Fix tự động không đủ mạnh hoặc sửa không triệt để.
-- Pipeline tự động quá phức tạp, nhiều JSON/JSONL khiến thao tác thủ công cực hình.
-- Provider mạnh nhất hiện dùng chỉ có giao diện chat, không có API/global memory.
-
-Sau nhiều lần thử, hướng cuối cùng được chọn là:
-
-> Không cố tự động hóa toàn bộ.  
-> Dùng app để **orchestrate prompt thủ công**: app chuẩn bị prompt đúng, người paste vào model chat mạnh, paste kết quả về app, app validate/lưu/đưa dữ liệu sang bước tiếp theo.
+README này chỉ mô tả hiện trạng repo và schema đang có trong `prompts/*.txt`.
 
 ---
 
-# 2. Vì sao các pipeline cũ không đủ ổn
-
-Các phiên bản cũ từng đi theo hướng:
+## 1. Cấu trúc repo
 
 ```text
-extract glossary
-→ extract relationships
-→ merge canon
-→ build translation pack
-→ build scene context
-→ translate
-→ QA/Fix
-```
-
-Sau đó thêm:
-
-```text
-pronoun states
-scene context
-narrator reference policy
-fallback pronoun rules
-post-fix deterministic enforcement
-```
-
-Kết quả có cải thiện, nhưng vẫn không ổn định.
-
-## 2.1. AI được giao quá nhiều quyền suy luận
-
-Các pipeline cũ dựa vào việc model tự hiểu:
-
-```text
-- ai đang nói?
-- nói với ai?
-- quan hệ đang ở trạng thái nào?
-- bối cảnh cảnh này là gì?
-- xưng hô nào hợp?
-```
-
-Với tiếng Việt, chỉ cần sai speaker/listener một dòng thoại là xưng hô vỡ ngay.
-
-## 2.2. Quan hệ/xưng hô không thể chỉ xử lý ở cấp segment mơ hồ
-
-Có những quan hệ nên là canon cấp volume:
-
-```text
-Tigre -> Elen: tôi-cô
-Elen -> Tigre: ta-ngươi
-```
-
-Nếu mỗi segment lại bắt AI tự suy luận, nó sẽ dao động.
-
-## 2.3. Speaker attribution là mấu chốt
-
-Đột phá lớn nhất là nhận ra:
-
-> Với tiếng Việt, trước khi dịch cần biết **ai nói câu này với ai**.
-
-Do đó pipeline final thêm bước:
-
-```text
-Dialogue Labeling
-```
-
-Ví dụ:
-
-```text
-[Elen -> Tigre]: 你终于来了。
-[Tigre -> Elen]: 我答应过你。
-[Tigre -> self]:
-```
-
-Sau đó mới dịch. Nhờ vậy model dịch không còn phải tự đoán sân khấu.
-
-## 2.4. Manual chat model mạnh tốt hơn API model trong trường hợp này
-
-Provider chat-only >500B có:
-
-- chất lượng dịch tốt,
-- hiểu tiếng Trung tốt,
-- tốc độ phản hồi nhanh,
-- chấp nhận nội dung nhạy cảm hơn,
-- nhưng không có API và không có global memory.
-
-Vì vậy giải pháp hợp lý là **Manual Prompt Studio**.
-
----
-
-# 3. Triết lý final
-
-Pipeline final được xây lại theo nguyên tắc:
-
-```text
-Glossary = từ đúng.
-Volume relationship/pronoun canon = xưng hô mặc định đúng.
-Segment pronoun table = kế thừa từ volume canon + override nếu cần.
-Dialogue labeling = biết ai nói với ai trước khi dịch.
-Translation = không còn tự đoán sân khấu.
-QA/Fix = optional, chỉ chạy khi người dùng muốn.
-```
-
-Cốt lõi:
-
-- Người dùng chuẩn hóa những thứ quan trọng ở cấp volume.
-- App lo việc gom dữ liệu, tạo prompt, lưu artifact.
-- AI chat model làm các bước cần ngôn ngữ mạnh.
-- Không để AI âm thầm tự quyết định tất cả.
-- Không bắt người dùng mở JSONL thủ công để copy/paste.
-
----
-
-# 4. Pipeline final — tổng quan
-
-Pipeline cuối cùng gồm các phase sau:
-
-```text
-PHASE 1 — GLOSSARY
-
-1. Extract Volume Glossary
-2. Merge Volume Glossary
-3. Human chuẩn hóa Volume Glossary
-4. Build Segment Glossary
-
-
-PHASE 2 — RELATIONSHIP / PRONOUN
-
-5. Extract Volume Relationships
-6. Merge Volume Relationships
-7. Human chuẩn hóa Volume Relationship / Pronoun Canon
-8. Build Segment Pronoun Table
-
-
-PHASE 3 — SEGMENT PREP
-
-9. Build Segment Context
-10. Label Dialogue
-11. Human review low-confidence dialogue labels nếu cần
-
-
-PHASE 4 — TRANSLATION
-
-12. Translate Labeled Segment
-13. Assemble Volume
-
-
-PHASE 5 — OPTIONAL
-
-14. QA
-15. Fix
-16. Assemble Fixed Volume
+translate-LN-pipeline/
+├─ config/
+│  └─ config.json
+├─ prompts/
+│  ├─ 00_json_output_policy.txt
+│  ├─ 01_extract_volume_glossary.txt
+│  ├─ 02_merge_volume_glossary.txt
+│  ├─ 03_build_segment_glossary.txt
+│  ├─ 04_extract_volume_relationships.txt
+│  ├─ 05_merge_volume_relationships.txt
+│  ├─ 06_build_segment_pronouns.txt
+│  ├─ 07_build_segment_context.txt
+│  ├─ 08_label_dialogue.txt
+│  ├─ 09_translate_labeled_segment.txt
+│  ├─ 10_qa_segment.txt
+│  ├─ 11_fix_segment.txt
+│  └─ 12_quick_fix.txt
+├─ src/
+│  ├─ api_client.py
+│  ├─ config_loader.py
+│  ├─ json_utils.py
+│  ├─ main.py
+│  ├─ pipeline.py
+│  ├─ prompt_loader.py
+│  └─ storage.py
+├─ manual_prompt_studio.py
+├─ release_builder.py
+├─ run.py
+├─ requirements.txt
+└─ README.md
 ```
 
 ---
 
-# 5. Dữ liệu đầu vào
+## 2. Cài đặt
 
-## 5.1. Source volume gốc
+Tạo virtual environment:
 
-File source gốc nằm ở:
+```bash
+python -m venv .venv
+```
+
+Cài dependencies trong `requirements.txt`:
+
+```bash
+pip install -r requirements.txt
+```
+
+`requirements.txt` hiện có:
+
+```text
+openai>=1.0.0
+python-dotenv>=1.0.0
+```
+
+Nếu dùng `release_builder.py` để đóng EPUB, cần cài thêm `ebooklib` vì file này import `ebooklib.epub`:
+
+```bash
+pip install ebooklib
+```
+
+Tạo `.env` theo `.env.example`:
+
+```env
+DEEPSEEK_API_KEY=sk-...
+```
+
+---
+
+## 3. Config
+
+File config mặc định:
+
+```text
+config/config.json
+```
+
+Nội dung hiện tại:
+
+```json
+{
+  "project": {
+    "name": "ln_translate_pipeline_final",
+    "source_language": "zh",
+    "target_language": "vi"
+  },
+  "api": {
+    "provider": "deepseek",
+    "base_url": "https://api.deepseek.com",
+    "api_key_env": "DEEPSEEK_API_KEY",
+    "timeout_seconds": 900,
+    "max_retries": 5,
+    "retry_backoff_seconds": 3
+  },
+  "model": {
+    "name": "deepseek-reasoner",
+    "temperature": null,
+    "top_p": null,
+    "json_mode": true
+  },
+  "runtime": {
+    "max_workers": 30,
+    "resume": true,
+    "overwrite_existing": false
+  },
+  "dialogue_labeling": {
+    "review_confidence_threshold": 0.72,
+    "auto_accept_confidence_threshold": 0.82,
+    "force_review_if_unknown_speaker": true,
+    "force_review_if_unknown_listener": true,
+    "force_review_if_multiple_possible_speakers": true,
+    "force_review_if_no_matching_pronoun_rule": true
+  },
+  "translation": {
+    "qa_enabled_by_default": false,
+    "context_strategy": "independent"
+  },
+  "paths": {
+    "source_dir": "data/source",
+    "segments_dir": "data/segments",
+    "canon_dir": "data/canon",
+    "working_dir": "data/working",
+    "release_dir": "data/release",
+    "prompts_dir": "prompts"
+  }
+}
+```
+
+Ghi chú theo code hiện tại:
+
+* API key được đọc từ biến môi trường có tên trong `api.api_key_env`.
+* API client dùng `OpenAI(api_key=..., base_url=...)`.
+* Nếu `model.json_mode` là `true`, request dùng `response_format` với type `json_object`.
+* `runtime.overwrite_existing=false` khiến batch step bỏ qua item đã có dòng JSONL thành công.
+* Các prompt có placeholder `{{genre}}`. `manual_prompt_studio.py` có thay placeholder này bằng `genre` trong `project_config.json`. CLI trong `src/pipeline.py` hiện chỉ truyền `INPUT_JSON` vào prompt.
+
+---
+
+## 4. Input data
+
+### 4.1. Source volume
+
+Theo `src/storage.py`, source volume được đọc từ:
 
 ```text
 data/source/volume_01.json
 ```
 
-Schema:
+Schema dạng list:
 
 ```json
 [
@@ -210,15 +175,29 @@ Schema:
 ]
 ```
 
-## 5.2. Segment file
+Schema dạng object có key `chapters`:
 
-File segment nằm ở:
+```json
+{
+  "chapters": [
+    {
+      "chapter": 1,
+      "name": "Tên chương",
+      "content": "Nội dung tiếng Trung"
+    }
+  ]
+}
+```
+
+### 4.2. Segment file
+
+Theo `src/storage.py`, segment file được đọc từ:
 
 ```text
 data/segments/volume_01.segments.json
 ```
 
-Schema:
+Schema dạng list:
 
 ```json
 [
@@ -231,41 +210,181 @@ Schema:
 ]
 ```
 
-`segment` nên ổn định, ví dụ:
-
-```text
-c001_s001
-c001_s002
-c002_s001
-```
-
-Đây là key quan trọng để nối artifact qua các bước.
-
----
-
-# 6. Các artifact chính
-
-Pipeline lưu dữ liệu dưới dạng file JSON/JSONL để dễ backup và inspect.
-
-## 6.1. Glossary
-
-Draft glossary:
-
-```text
-data/canon/glossary/drafts/volume_01.glossary.draft.json
-```
-
-Finalized glossary:
-
-```text
-data/canon/glossary/finalized/volume_01.glossary.json
-```
-
-Schema chính:
+Schema dạng object có key `segments`:
 
 ```json
 {
-  "volume": 1,
+  "segments": [
+    {
+      "chapter": 1,
+      "name": "Tên chương",
+      "segment": "c001_s001",
+      "content": "Nội dung tiếng Trung của segment"
+    }
+  ]
+}
+```
+
+`src/json_utils.py` dùng `segment` làm `item_id` nếu record có field này. Nếu không có `segment`, `item_id` fallback thành dạng `c001`, `c002`, ... dựa trên `chapter`.
+
+---
+
+## 5. JSON output policy
+
+File:
+
+```text
+prompts/00_json_output_policy.txt
+```
+
+Nội dung:
+
+```text
+Return strict JSON only. Do not include markdown. Do not wrap JSON in code fences. Do not include comments. Use null when unknown. Use [] for empty arrays. Confidence must be a number from 0 to 1.
+```
+
+`src/prompt_loader.py` thay `{{JSON_OUTPUT_POLICY}}` trong từng prompt bằng nội dung file này.
+
+`src/json_utils.py` có `loads_json_maybe()` để parse JSON. Hàm này xử lý được response bị bọc trong code fence, hoặc cố lấy object từ dấu `{` đầu tiên đến dấu `}` cuối cùng nếu parse trực tiếp thất bại.
+
+---
+
+## 6. CLI commands
+
+Entry point:
+
+```bash
+python -m src.main <command>
+```
+
+Các command hiện có:
+
+```bash
+python -m src.main glossary-prep --volumes 1
+python -m src.main glossary-prep --volumes 1-5
+python -m src.main glossary-prep --volumes 1,3,7-10
+python -m src.main glossary-prep --volumes all
+
+python -m src.main extract-glossary --volume 1
+python -m src.main merge-glossary --volume 1
+python -m src.main merge-glossary --volume 1 --no-previous
+python -m src.main approve-glossary --volume 1
+python -m src.main approve-glossary --volume 1 --overwrite
+python -m src.main approve-glossary --volume 1 --from-file path/to/file.json --overwrite
+
+python -m src.main relationship-prep --volume 1
+python -m src.main extract-relationships --volume 1
+python -m src.main merge-relationships --volume 1
+python -m src.main merge-relationships --volume 1 --no-previous
+python -m src.main approve-relationships --volume 1
+python -m src.main approve-relationships --volume 1 --overwrite
+python -m src.main approve-relationships --volume 1 --from-file path/to/file.json --overwrite
+
+python -m src.main build-segment-glossary --volume 1
+python -m src.main build-segment-pronouns --volume 1
+python -m src.main build-context --volume 1
+python -m src.main label-dialogue --volume 1
+python -m src.main translate --volume 1
+python -m src.main assemble --volume 1
+
+python -m src.main qa --volume 1
+python -m src.main fix --volume 1
+python -m src.main assemble --volume 1 --fixed
+
+python -m src.main run-translation --volume 1
+```
+
+Shortcut trong `src/pipeline.py`:
+
+* `glossary-prep`: chạy `extract_glossary` rồi `merge_glossary`.
+* `relationship-prep`: chạy `extract_relationships` rồi `merge_relationships`.
+* `run-translation`: chạy `build_segment_glossary`, `build_segment_pronouns`, `build_segment_context`, `label_dialogue`, `translate`, rồi `assemble`.
+
+---
+
+## 7. JSONL wrapper
+
+Các batch step trong `src/pipeline.py` ghi JSONL theo wrapper này khi thành công:
+
+```json
+{
+  "item_id": "c001_s001",
+  "status": "success",
+  "result": {}
+}
+```
+
+Khi lỗi:
+
+```json
+{
+  "item_id": "c001_s001",
+  "status": "failed",
+  "error": "Error message"
+}
+```
+
+Nếu `runtime.overwrite_existing=false`, item đã có dòng `status="success"` sẽ bị skip khi chạy lại cùng output path.
+
+---
+
+## 8. Prompt schemas
+
+Phần này chép lại schema output đang được khai báo trong `prompts/*.txt`.
+
+### 8.1. `01_extract_volume_glossary.txt`
+
+Task: extract translation-relevant glossary candidates từ một chapter hoặc segment. Prompt yêu cầu không dịch chapter, không tóm tắt plot, chỉ extract term quan trọng cho dịch về sau.
+
+Scope trong prompt:
+
+* Character names
+* Aliases, titles, epithets, nicknames
+* Locations
+* Organizations
+* Weapons, artifacts
+* Magic, skills, techniques, named attacks
+* Important recurring concepts
+
+Output:
+
+```json
+{
+  "item_id": "",
+  "chapter": 0,
+  "segment": null,
+  "candidates": [
+    {
+      "source": "",
+      "suggested_vi": "",
+      "type": "character|alias|title|epithet|location|organization|weapon|artifact|magic|skill|technique|named_attack|concept|other",
+      "reason": ""
+    }
+  ],
+  "uncertain_items": []
+}
+```
+
+CLI output:
+
+```text
+data/working/glossary_extractions/volume_01.glossary_extractions.jsonl
+```
+
+### 8.2. `02_merge_volume_glossary.txt`
+
+Task: merge chapter-level extraction outputs thành volume-level glossary và character merge candidates. Prompt yêu cầu không dịch novel, không merge directed relationship/pronoun data, không overwrite existing canon.
+
+Status rules trong prompt:
+
+* `confirmed`: strict hard-translate. Translation model sẽ force exact term.
+* `tentative`: soft-translate. Translation model dùng như reference nhưng có thể adapt theo context.
+
+Output:
+
+```json
+{
+  "volume": 0,
   "volume_merge_glossary": [
     {
       "id": "",
@@ -281,532 +400,678 @@ Schema chính:
 }
 ```
 
-## 6.2. Segment Glossary
+CLI outputs:
+
+```text
+data/canon/glossary/drafts/volume_01.glossary.draft.json
+data/canon/glossary/finalized/volume_01.glossary.json
+```
+
+### 8.3. `03_build_segment_glossary.txt`
+
+Task: filter `volume_glossary` xuống các item xuất hiện hoặc trực tiếp liên quan tới segment hiện tại. Prompt yêu cầu không dịch segment, không invent glossary item mới, và đưa term quan trọng còn thiếu vào `missing_glossary_candidates`.
+
+Output:
+
+```json
+{
+  "item_id": "",
+  "chapter": 0,
+  "segment": "",
+  "segment_glossary": [
+    {
+      "id": "",
+      "source": "",
+      "vi": "",
+      "type": "",
+      "aliases": [],
+      "status": "confirmed|tentative",
+      "notes": ""
+    }
+  ],
+  "missing_glossary_candidates": [
+    {
+      "source": "",
+      "suggested_vi": "",
+      "reason": ""
+    }
+  ]
+}
+```
+
+CLI output:
 
 ```text
 data/working/segment_glossaries/volume_01.segment_glossaries.jsonl
 ```
 
-Mỗi dòng là một artifact cho một segment.
+### 8.4. `04_extract_volume_relationships.txt`
 
-Schema chính:
+Task: extract volume-level relationship/pronoun candidates. Prompt yêu cầu giữ đơn giản, không tạo emotional states phức tạp. Directed pair quan trọng: `A -> B` khác `B -> A`. Prompt cũng yêu cầu extract self-reference pairs với `listener` là `self` khi có.
+
+Output:
 
 ```json
 {
-  "item_id": "c001_s001",
-  "status": "success",
-  "result": {
-    "item_id": "c001_s001",
-    "chapter": 1,
-    "segment": "c001_s001",
-    "segment_glossary": [
-      {
-        "id": "",
-        "source": "",
-        "vi": "",
-        "type": "",
-        "rule": "always_use|use_when_context_matches",
-        "forbidden_translations": [],
-        "notes": ""
-      }
-    ],
-    "missing_glossary_candidates": []
-  }
+  "item_id": "",
+  "chapter": 0,
+  "segment": null,
+  "relationship_candidates": [
+    {
+      "speaker": "",
+      "listener": "",
+      "speaker_is_to_listener": "",
+      "listener_is_to_speaker": "",
+      "self": "",
+      "other": "",
+      "relationship": ""
+    }
+  ],
+  "uncertain_pairs": []
 }
 ```
 
-## 6.3. Volume Relationship / Pronoun Canon
-
-Draft:
+CLI output:
 
 ```text
-data/canon/relationships/drafts/volume_01.relationships.draft.json
+data/working/relationship_extractions/volume_01.relationships_extractions.jsonl
 ```
 
-Finalized:
+### 8.5. `05_merge_volume_relationships.txt`
 
-```text
-data/canon/relationships/finalized/volume_01.relationships.json
-```
+Task: merge chapter-level extraction outputs thành volume-level relationship merge candidates. Prompt yêu cầu giữ đơn giản với `speaker`, `listener`, `relationship`, `self`, `other`, `notes`; không dịch novel; không discard variants; không overwrite existing canon; không tạo state machine phức tạp.
 
-Schema chính:
+Status rules trong prompt:
+
+* `confirmed`: relationship giữa hai nhân vật đã confirmed.
+* `tentative`: relationship soft/uncertain và có thể đổi.
+
+Output:
 
 ```json
 {
-  "volume": 1,
+  "volume": 0,
   "relationship_pronoun_canon": [
     {
       "id": "",
-      "speaker": "Tigre",
-      "listener": "Elen",
-      "relationship": "đồng minh / có thiện cảm",
-      "self": "tôi",
-      "other": "cô",
+      "speaker": "",
+      "listener": "",
+      "relationship": "",
+      "self": "",
+      "other": "",
       "scope": "volume_default",
-      "status": "confirmed|tentative|conflict|deprecated",
+      "status": "confirmed|tentative",
       "variants": [
         {
-          "self": "ta",
-          "other": "ngươi",
-          "usage": "khi giữ thế bề trên / trêu chọc",
-          "confidence": 0.78
+          "self": "",
+          "other": "",
+          "relationship": ""
         }
       ],
-      "notes": "",
-      "needs_human_review": false
+      "notes": ""
     }
   ],
   "review_notes": []
 }
 ```
 
-Điểm quan trọng:
+CLI outputs:
 
-> Relationship/pronoun canon là **cấp volume**.  
-> Không nhập lại quan hệ nam chính/nữ chính cho từng segment.
+```text
+data/canon/relationships/drafts/volume_01.relationships.draft.json
+data/canon/relationships/finalized/volume_01.relationships.json
+```
 
-## 6.4. Segment Pronoun Table
+### 8.6. `06_build_segment_pronouns.txt`
+
+Task: build segment-level pronoun table bằng cách inherit từ finalized volume relationship/pronoun canon. Prompt yêu cầu chỉ tạo `segment_override_candidates` khi source rõ ràng cho thấy local change, và mark `missing_rules` nếu dialogue pair xuất hiện nhưng không có volume rule.
+
+Output:
+
+```json
+{
+  "item_id": "",
+  "chapter": 0,
+  "segment": "",
+  "segment_pronoun_table": [
+    {
+      "speaker": "",
+      "listener": "",
+      "relationship": "",
+      "self": "",
+      "other": "",
+      "variants": [
+        {
+          "self": "",
+          "other": "",
+          "relationship": ""
+        }
+      ],
+      "source": "inherited_from_volume|segment_override|fallback",
+      "notes": ""
+    }
+  ],
+  "segment_override_candidates": [
+    {
+      "speaker": "",
+      "listener": "",
+      "self": "",
+      "other": "",
+      "reason": ""
+    }
+  ],
+  "missing_rules": [
+    {
+      "speaker": "",
+      "listener": "",
+      "reason": ""
+    }
+  ]
+}
+```
+
+CLI output:
 
 ```text
 data/canon/segment_pronouns/volume_01.segment_pronouns.jsonl
 ```
 
-Schema chính:
+### 8.7. `07_build_segment_context.txt`
+
+Task: create short translation-useful context cho một segment. Prompt yêu cầu không tạo summary dài, không thêm analysis không phục vụ dịch, và dùng segment glossary cùng segment pronoun table.
+
+Output:
 
 ```json
 {
-  "item_id": "c001_s001",
-  "status": "success",
-  "result": {
-    "item_id": "c001_s001",
-    "chapter": 1,
-    "segment": "c001_s001",
-    "segment_pronoun_table": [
-      {
-        "speaker": "Tigre",
-        "listener": "Elen",
-        "relationship": "đồng minh / có thiện cảm",
-        "self": "tôi",
-        "other": "cô",
-        "variants": [],
-        "source": "inherited_from_volume|segment_override|fallback",
-        "notes": ""
-      }
-    ],
-    "segment_override_candidates": [],
-    "missing_rules": []
+  "item_id": "",
+  "chapter": 0,
+  "segment": "",
+  "context": {
+    "appearing_characters": [],
+    "scene_summary": "",
+    "scene_type": "battlefield|private_conversation|court|travel|daily_life|action|comedy|inner_monologue|strategy|other",
+    "tone": "",
+    "translation_notes": []
   }
 }
 ```
 
-Segment pronoun table được build từ volume canon.
-
-Logic:
-
-```text
-Volume Relationship Canon
-→ lọc nhân vật xuất hiện trong segment
-→ inherit xưng hô mặc định
-→ thêm override candidate nếu có ngoại lệ
-→ báo missing_rules nếu thiếu
-```
-
-## 6.5. Segment Context
+CLI output:
 
 ```text
 data/working/segment_contexts/volume_01.segment_contexts.jsonl
 ```
 
-Schema:
+### 8.8. `08_label_dialogue.txt`
+
+Task: label only dialogue lines trong source segment bằng speaker/listener tags. Prompt yêu cầu không dịch, không rewrite source text, không add/remove content, không label narration, không tạo `[NARRATION]` tags. `labeled_source` phải preserve full original segment content, nhưng chỉ dialogue lines nhận label.
+
+Label examples trong prompt:
+
+```text
+[Tigre -> self]: source dialogue
+[Tigre -> Elen]: source dialogue
+[Elen -> GROUP]: source dialogue
+[UNKNOWN -> UNKNOWN]: source dialogue
+```
+
+Output schema thực tế trong prompt:
 
 ```json
 {
-  "item_id": "c001_s001",
-  "status": "success",
-  "result": {
-    "item_id": "c001_s001",
-    "chapter": 1,
-    "segment": "c001_s001",
-    "context": {
-      "appearing_characters": [],
-      "scene_summary": "",
-      "scene_type": "battlefield|private_conversation|court|travel|daily_life|action|comedy|inner_monologue|strategy|other",
-      "tone": "",
-      "translation_notes": []
-    }
-  }
+  "item_id": "",
+  "chapter": 0,
+  "segment": "",
+  "labeled_source": ""
 }
 ```
 
-Context chỉ cần ngắn, phục vụ dịch segment, không phải summary dài.
+Lưu ý: phần rule của prompt có câu `units should contain dialogue units only`, nhưng output schema hiện không khai báo field `units`.
 
-## 6.6. Dialogue Labels
+CLI output:
 
 ```text
 data/working/dialogue_labels/volume_01.dialogue_labels.jsonl
 ```
 
-Schema:
+### 8.9. `09_translate_labeled_segment.txt`
+
+Task: translate labeled source sang tiếng Việt. Prompt nói full source content nằm trong `dialogue_labels.labeled_source` và cần dùng field đó làm source để dịch.
+
+Các rule chính trong prompt:
+
+* Plain unlabeled source text là narration.
+* Dialogue lines được label dạng `[Speaker -> Listener | confidence=...]: source dialogue`.
+* Dùng labels để chọn xưng hô tiếng Việt.
+* Không output speaker labels trong final translation.
+* Không translate labels.
+* Không remove quotation marks hoặc dialogue boundary markers.
+* Không merge dialogue vào narration.
+* Nếu glossary term có `status="confirmed"`, phải dùng exact translation.
+* Nếu glossary term có `status="tentative"`, xem là strong suggestion nhưng có thể adapt theo context.
+* Apply `segment_pronoun_table` theo `speaker -> listener`.
+* Không invent pronoun pairs.
+* Không dùng variants trừ khi được liệt kê rõ.
+* Nếu speaker/listener là `UNKNOWN`, dịch trung tính và tránh risky pronouns như `anh/em`.
+* Không override dialogue labels bằng guess riêng trừ khi label là `UNKNOWN`.
+* Unlabeled text trong `labeled_source` là narration.
+* Giữ third-person references ổn định.
+* Không dùng `hắn` trừ khi narration hostile, dismissive hoặc nhân vật được frame như vậy.
+
+Output:
 
 ```json
 {
-  "item_id": "c001_s001",
-  "status": "success",
-  "result": {
-    "item_id": "c001_s001",
-    "chapter": 1,
-    "segment": "c001_s001",
-    "labeled_source": "",
-    "units": [
-      {
-        "unit_id": "",
-        "type": "dialogue",
-        "source_text": "",
-        "speaker": "Tigre",
-        "listener": "Elen",
-        "possible_speakers": [],
-        "possible_listeners": [],
-        "matching_pronoun_rule": null,
-        "confidence": 0.91,
-        "review_required": false,
-        "reason": ""
-      }
-    ],
-    "label_report": {
-      "low_confidence_units": [],
-      "unknown_units": [],
-      "missing_pronoun_rule_units": [],
-      "human_review_required": false
-    }
-  }
+  "item_id": "",
+  "volume": 0,
+  "chapter": 0,
+  "name": "",
+  "segment": "",
+  "translation": "",
+  "translator_notes": []
 }
 ```
 
-Sau patch cuối:
-
-- Chỉ thoại mới có label.
-- Narration giữ nguyên plain text trong `labeled_source`.
-- Không dùng `[NARRATION]`.
-
-Ví dụ đúng:
-
-```text
-城下，战姬静静地望着远方。
-
-[Elen -> Tigre | confidence=0.91]: 你终于来了。
-
-Tigre握紧了手中的弓。
-
-[Tigre -> Elen | confidence=0.88]: 我答应过你。
-```
-
-## 6.7. Translation
-
-Draft translation:
+CLI output:
 
 ```text
 data/working/translations/draft/volume_01.translated.jsonl
 ```
 
-Schema:
+### 8.10. `10_qa_segment.txt`
+
+Task: check translated segment against source segment, labeled dialogue, segment glossary, segment pronoun table và segment context. Prompt nói QA là optional và chỉ nên report meaningful errors.
+
+Prompt check:
+
+1. Glossary mismatch
+2. Wrong pronouns according to speaker -> listener labels
+3. English terms not allowed by glossary
+4. Added/omitted meaning
+5. Major tone mismatch
+
+Output:
 
 ```json
 {
-  "item_id": "c001_s001",
-  "status": "success",
-  "result": {
-    "item_id": "c001_s001",
-    "volume": 1,
-    "chapter": 1,
-    "name": "Tên chương",
-    "segment": "c001_s001",
-    "translation": "",
-    "translator_notes": []
-  }
+  "item_id": "",
+  "volume": 0,
+  "chapter": 0,
+  "segment": "",
+  "requires_fix": false,
+  "max_severity": "none|low|medium|high|critical",
+  "issues": [
+    {
+      "severity": "low|medium|high|critical",
+      "type": "glossary|pronoun|speaker_label|meaning|tone|other",
+      "source_excerpt": "",
+      "translation_excerpt": "",
+      "problem": "",
+      "expected": "",
+      "suggested_fix": "",
+      "requires_fix": false
+    }
+  ],
+  "summary": ""
 }
 ```
 
-Fixed translation optional:
+CLI output:
+
+```text
+data/working/translations/qa/volume_01.qa.jsonl
+```
+
+### 8.11. `11_fix_segment.txt`
+
+Task: apply QA fixes to translated segment. Prompt yêu cầu không rewrite unrelated parts, không đổi glossary hoặc pronoun rules, và return full corrected segment.
+
+Output:
+
+```json
+{
+  "item_id": "",
+  "volume": 0,
+  "chapter": 0,
+  "segment": "",
+  "fixed_translation": "",
+  "applied_fixes": [],
+  "remaining_concerns": []
+}
+```
+
+CLI output:
 
 ```text
 data/working/translations/fixed/volume_01.fixed.jsonl
 ```
 
+### 8.12. `12_quick_fix.txt`
+
+Task: fix một snippet cụ thể của bản dịch theo instruction của user.
+
+Input prompt sử dụng các field:
+
+```json
+{
+  "source_context": "",
+  "highlighted_translation_to_fix": "",
+  "instruction": ""
+}
+```
+
+Rules trong prompt:
+
+* Chỉ translate/fix `highlighted_translation_to_fix`.
+* Không rewrite entire segment.
+* `new_translation_snippet` phải thay thế được snippet cũ trong câu rộng hơn mà không hỏng ngữ pháp.
+
+Output:
+
+```json
+{
+  "new_translation_snippet": "",
+  "reasoning": ""
+}
+```
+
 ---
 
-# 7. Prompt design final
+## 9. Workflow CLI/API đầy đủ
 
-## 7.1. Nguyên tắc chung
+```bash
+# 1. Glossary canon
+python -m src.main extract-glossary --volume 1
+python -m src.main merge-glossary --volume 1
+python -m src.main approve-glossary --volume 1 --overwrite
 
-Các prompt không còn cố nhồi quá nhiều global policy.
+# 2. Relationship/pronoun canon
+python -m src.main extract-relationships --volume 1
+python -m src.main merge-relationships --volume 1
+python -m src.main approve-relationships --volume 1 --overwrite
 
-Mỗi prompt làm đúng một việc:
+# 3. Segment data
+python -m src.main build-segment-glossary --volume 1
+python -m src.main build-segment-pronouns --volume 1
+python -m src.main build-context --volume 1
+python -m src.main label-dialogue --volume 1
 
-```text
-extract glossary
-merge glossary
-build segment glossary
-extract relationships
-merge relationships
-build segment pronouns
-build context
-label dialogue
-translate
-QA
-fix
+# 4. Translation
+python -m src.main translate --volume 1
+python -m src.main assemble --volume 1
+
+# 5. Optional QA/Fix
+python -m src.main qa --volume 1
+python -m src.main fix --volume 1
+python -m src.main assemble --volume 1 --fixed
 ```
 
-## 7.2. Điểm sửa quan trọng: translate không gửi source_content trùng lặp
+Nếu đã có finalized glossary và finalized relationships:
 
-Ở một thời điểm, step translate gửi cả:
-
-```text
-source_content
-dialogue_labels.labeled_source
+```bash
+python -m src.main run-translation --volume 1
 ```
 
-Điều này làm prompt phình gần gấp đôi.
+---
 
-Bản final nên **không gửi `source_content` trong translate input**, vì `dialogue_labels.labeled_source` đã chứa đủ source.
+## 10. Artifact paths
 
-Translate input nên gồm:
+Với volume 1 và paths mặc định:
+
+```text
+data/working/glossary_extractions/volume_01.glossary_extractions.jsonl
+
+data/canon/glossary/drafts/volume_01.glossary.draft.json
+data/canon/glossary/finalized/volume_01.glossary.json
+
+data/working/segment_glossaries/volume_01.segment_glossaries.jsonl
+
+data/working/relationship_extractions/volume_01.relationships_extractions.jsonl
+
+data/canon/relationships/drafts/volume_01.relationships.draft.json
+data/canon/relationships/finalized/volume_01.relationships.json
+
+data/canon/segment_pronouns/volume_01.segment_pronouns.jsonl
+
+data/working/segment_contexts/volume_01.segment_contexts.jsonl
+
+data/working/dialogue_labels/volume_01.dialogue_labels.jsonl
+
+data/working/translations/draft/volume_01.translated.jsonl
+data/working/translations/qa/volume_01.qa.jsonl
+data/working/translations/fixed/volume_01.fixed.jsonl
+
+data/release/volume_01.vi.json
+data/release/volume_01.vi.md
+```
+
+---
+
+## 11. Assemble output
+
+`assemble` đọc translation JSONL và ghép các segment theo chapter.
+
+Draft mode đọc:
+
+```text
+data/working/translations/draft/volume_01.translated.jsonl
+```
+
+và lấy:
+
+```text
+result.translation
+```
+
+Fixed mode đọc:
+
+```text
+data/working/translations/fixed/volume_01.fixed.jsonl
+```
+
+và ưu tiên:
+
+```text
+result.fixed_translation
+```
+
+Nếu không có `fixed_translation`, code fallback sang `result.translation`.
+
+JSON release có dạng:
 
 ```json
 {
   "volume": 1,
-  "chapter": 1,
-  "segment": "c001_s001",
-  "name": "Tên chương",
-  "segment_glossary": {},
-  "segment_pronoun_table": {},
-  "segment_context": {},
-  "dialogue_labels": {}
+  "chapters": [
+    {
+      "chapter": 1,
+      "name": "Tên chương",
+      "segments": [
+        {
+          "segment": "c001_s001",
+          "translation": ""
+        }
+      ],
+      "content": ""
+    }
+  ]
 }
 ```
 
-## 7.3. Narration trong prompt dịch
-
-Sau patch cuối, prompt dịch hiểu:
+Markdown release có dạng:
 
 ```text
-plain unlabeled text = narration
-labeled lines = dialogue
-```
+# Volume 01
 
-Narration rules quan trọng:
+## Chapter 1 — Tên chương
 
-```text
-- Không đổi lung tung cậu ấy / anh ấy / ông ấy.
-- Không đổi lung tung cô ấy / bà ấy / nàng.
-- Nếu không chắc, dùng tên riêng hoặc danh hiệu canon.
-- Không gọi người già là cậu ấy.
-- Không gọi cô gái trẻ là bà ấy.
-- Không dùng “hắn” trừ khi narration có sắc thái thù địch/khinh miệt.
-```
-
-## 7.4. Dialogue trong prompt dịch
-
-Dialogue rules:
-
-```text
-- Dialogue labels define who speaks to whom.
-- Do not output speaker labels.
-- Use segment_pronoun_table by speaker -> listener.
-- If UNKNOWN/GROUP, avoid risky pronouns.
-- Use variants only if explicitly provided and phù hợp immediate tone.
+Nội dung chương đã ghép
 ```
 
 ---
 
-# 8. Manual Prompt Studio
-
-## 8.1. Vai trò
-
-Manual Prompt Studio là app chính để vận hành workflow chat-only.
-
-Nó không gọi API.
-
-Nó làm các việc:
-
-```text
-- mở project workspace
-- đọc source/segments/artifacts
-- generate prompt hoàn chỉnh cho từng step
-- copy prompt để paste vào chat model
-- nhận response JSON paste ngược lại
-- validate/import response
-- lưu artifact
-- mở editor để sửa glossary/pronoun/dialogue labels
-- assemble/release local nếu cần
-```
-
-## 8.2. Vì sao cần app này
-
-Provider model mạnh hiện dùng chỉ có chat UI, không có API.
-
-Nếu thao tác trực tiếp bằng file JSON/JSONL sẽ rất đau:
-
-```text
-- phải tự copy source
-- tự copy glossary
-- tự copy pronoun table
-- tự copy prompt
-- tự paste result vào file
-- dễ sai key/segment
-```
-
-Manual Prompt Studio biến pipeline thành thao tác:
-
-```text
-Generate Prompt
-Copy
-Paste to chat
-Paste response
-Validate
-Import
-Next step
-```
-
-## 8.3. Bản v1
-
-Bản v1 có:
-
-```text
-- Dark Tkinter UI
-- Project tree Volume → Chapter → Segment
-- Step list theo node
-- Generate/Copy prompt
-- Paste response/Validate/Import
-- Artifact editor cơ bản
-- Review Queue cơ bản
-- Local build: segment glossary / segment pronouns / assemble
-```
-
-## 8.4. Bản v2
-
-Bản v2 nâng cấp:
-
-```text
-- build segment glossary chuyển thành prompt-first
-- build segment pronouns chuyển thành prompt-first
-- thêm editor chuyên cho workflow mới:
-  - Volume Glossary
-  - Volume Relationships
-  - Segment Glossaries
-  - Segment Pronouns
-- vẫn giữ Assemble local
-```
-
-Điểm này rất quan trọng vì workflow mới muốn tận dụng model chat mạnh cho cả bước build segment glossary/pronouns, thay vì Python local đơn giản.
-
-## 8.5. Cách dùng Manual Prompt Studio
+## 12. Manual Prompt Studio
 
 Chạy:
 
 ```bash
-python manual_prompt_studio_v2.py
+python manual_prompt_studio.py
 ```
 
-Hoặc mở project root:
-
-```bash
-python manual_prompt_studio_v2.py /path/to/project_root
-```
-
-Quy trình cơ bản:
-
-1. Chọn volume/chapter/segment trong tree.
-2. Chọn step cần làm.
-3. Bấm `Generate Prompt`.
-4. Bấm `Copy Prompt`.
-5. Paste vào chat model.
-6. Copy response JSON từ chat.
-7. Paste vào app.
-8. Validate.
-9. Import.
-10. Chuyển sang step tiếp theo.
-
----
-
-# 9. Editor cho workflow mới
-
-Có một editor riêng theo kiểu bảng trái + JSON chi tiết phải.
-
-Các tab quan trọng:
+Tên app trong code:
 
 ```text
-Volume Glossary
-Volume Relationships
-Segment Glossaries
-Segment Pronouns
-Segment Contexts
-Dialogue Labels
-Reference
+Manual Prompt Studio v2
 ```
 
-Mục đích:
+Workspace path trong class `WS`:
 
-- Không phải mở hàng ngàn dòng JSON bằng Notepad.
-- Có thể lọc/search item.
-- Có thể sửa từng record.
-- Có thể validate lỗi cơ bản:
-  - glossary thiếu source/vi
-  - relationship thiếu speaker/listener/self/other
-  - segment_pronouns có missing_rules
-  - dialogue_labels cần review
+```text
+<repo_root>/data/<project_name>/
+```
 
-Editor được thiết kế dựa trên file editor đã tải lên và dùng cùng kiểu dark Tkinter.
+Các path chính:
 
----
+```text
+data/<project_name>/project_config.json
 
-# 10. Release Builder
+data/<project_name>/source/volume_01.json
+data/<project_name>/segments/volume_01.segments.json
 
-## 10.1. Mục tiêu
+data/<project_name>/canon/glossary/drafts/volume_01.glossary.draft.json
+data/<project_name>/canon/glossary/finalized/volume_01.glossary.json
 
-Tool `ln_release_builder.py` dùng để:
+data/<project_name>/canon/relationships/drafts/volume_01.relationships.draft.json
+data/<project_name>/canon/relationships/finalized/volume_01.relationships.json
 
-1. Đọc workspace pipeline.
-2. Ghép translation JSONL theo segment.
-3. Tái tạo JSON 3 biến:
+data/<project_name>/working/glossary_extractions/volume_01.glossary_extractions.jsonl
+data/<project_name>/working/relationship_extractions/volume_01.relationships_extractions.jsonl
+data/<project_name>/working/segment_glossaries/volume_01.segment_glossaries.jsonl
+data/<project_name>/canon/segment_pronouns/volume_01.segment_pronouns.jsonl
+data/<project_name>/working/segment_contexts/volume_01.segment_contexts.jsonl
+data/<project_name>/working/dialogue_labels/volume_01.dialogue_labels.jsonl
+data/<project_name>/working/translations/draft/volume_01.translated.jsonl
+data/<project_name>/working/translations/qa/volume_01.qa.jsonl
+data/<project_name>/working/translations/fixed/volume_01.fixed.jsonl
+
+data/<project_name>/release/volume_01.vi.json
+data/<project_name>/release/volume_01.vi.md
+```
+
+Default `project_config.json` nếu chưa có:
 
 ```json
-[
-  {
-    "chapter": 1,
-    "name": "Tên chương",
-    "content": "Nội dung chương đã ghép"
-  }
-]
+{
+  "name": "<project_name>",
+  "genre": "",
+  "level": "Heavy",
+  "enabled_steps": []
+}
 ```
 
-4. Tạo thư mục HTML chương.
-5. Tạo `0.html` TOC.
-6. Sẵn sàng để nén vào EPUB workflow.
+Manual Prompt Studio render prompt bằng cách thay:
 
-Tool này kế thừa style HTML/TOC từ script JSON-to-HTML đã tải lên, nhưng thêm bước đọc trực tiếp từ workspace pipeline.
+* `{{JSON_OUTPUT_POLICY}}`
+* `{{INPUT_JSON}}`
+* `{{genre}}`
 
-## 10.2. Cách chạy
+---
+
+## 13. Control panel `run.py`
+
+Chạy:
 
 ```bash
-python ln_release_builder.py
+python run.py
 ```
 
-Chọn:
+Tên GUI trong code:
 
 ```text
-Project Root
-Output Folder
-Volume
-Translation Source:
-  fixed_if_available
-  fixed_only
-  draft_only
-Novel Title
+Light Novel Translation Pipeline FINAL - Control Panel
 ```
 
-## 10.3. Output
+Các nút chính gọi CLI command:
 
-Ví dụ với volume 1:
+```text
+Glossary Prep
+Relationship Prep
+Approve Glossary
+Approve Relationships
+Build Segment Glossary
+Build Segment Pronouns
+Build Context
+Label Dialogue (AI)
+RUN FULL TRANSLATION FLOW
+Translate
+Assemble
+QA Segment
+Fix Segment
+Assemble (Fixed)
+```
+
+Nút `MỞ EDITOR FINAL` trong `run.py` cố mở file:
+
+```text
+ln_pipeline_final_editor.py
+```
+
+File này không có trong cây file root hiện tại của repo.
+
+`run.py` cũng đọc `progress.json` nếu file này tồn tại.
+
+---
+
+## 14. Release Builder
+
+Chạy:
+
+```bash
+python release_builder.py
+```
+
+Tên app trong code:
+
+```text
+LN Release Builder
+```
+
+Release Builder đọc từ Project Folder:
+
+```text
+segments/volume_01.segments.json
+working/translations/draft/volume_01.translated.jsonl
+working/translations/fixed/volume_01.fixed.jsonl
+```
+
+Translation Source trong UI có ba mode:
+
+```text
+fixed_if_available
+fixed_only
+draft_only
+```
+
+Draft rows lấy:
+
+```text
+result.translation
+```
+
+Fixed rows lấy:
+
+```text
+result.fixed_translation
+```
+
+Nếu fixed row không có `fixed_translation`, fallback sang:
+
+```text
+result.translation
+```
+
+Output trong Output Folder:
 
 ```text
 volume_01.json
@@ -818,516 +1083,64 @@ volume_01_html/
 volume_01.release_manifest.json
 ```
 
-## 10.4. JSON output
-
-```json
-[
-  {
-    "chapter": 1,
-    "name": "Tên chương",
-    "content": "Nội dung ghép từ các segment"
-  }
-]
-```
-
-## 10.5. HTML output
-
-Mỗi chương:
+Nếu bật Pack EPUB, output EPUB có dạng:
 
 ```text
-chapter_0001.html
-chapter_0002.html
-...
+<Book Title> - v01.epub
 ```
 
-TOC:
-
-```text
-0.html
-```
-
-HTML dùng class tương thích workflow cũ:
-
-```html
-<body class="calibre">
-<h1 class="header">...</h1>
-<p class="calibre3">...</p>
-```
-
-Có tùy chọn copy:
-
-```text
-0001.css
-0002.css
-```
-
----
-
-# 11. Workflow khuyến nghị hiện tại
-
-## 11.1. Chuẩn bị volume
-
-Đảm bảo có:
-
-```text
-data/source/volume_01.json
-data/segments/volume_01.segments.json
-```
-
-## 11.2. Glossary
-
-Trong Manual Prompt Studio:
-
-```text
-Volume/Chapter → Extract Glossary
-Volume → Merge Glossary
-Canon Studio → sửa Volume Glossary
-Approve/Save Finalized Glossary
-```
-
-Hoặc file:
-
-```text
-data/canon/glossary/finalized/volume_01.glossary.json
-```
-
-## 11.3. Segment Glossary
-
-```text
-Segment → Build Segment Glossary
-Paste model result
-Import
-Review if missing_glossary_candidates not empty
-```
-
-## 11.4. Relationship / Pronoun
-
-```text
-Volume/Segment → Extract Relationships
-Volume → Merge Relationships
-Canon Studio → sửa Volume Relationship Canon
-Approve/Save Finalized Relationships
-```
-
-File:
-
-```text
-data/canon/relationships/finalized/volume_01.relationships.json
-```
-
-## 11.5. Segment Pronouns
-
-```text
-Segment → Build Segment Pronouns
-Paste model result
-Import
-Review:
-  - segment_override_candidates
-  - missing_rules
-```
-
-## 11.6. Context
-
-```text
-Segment → Build Segment Context
-Paste/import
-```
-
-## 11.7. Dialogue Labeling
-
-```text
-Segment → Label Dialogue
-Paste/import
-Review low-confidence/UNKNOWN/missing rule
-```
-
-Sau patch cuối:
-
-- Chỉ thoại có label.
-- Narration plain text.
-
-## 11.8. Translation
-
-```text
-Segment → Translate
-Paste/import
-```
-
-Input gồm:
-
-```text
-dialogue_labels.labeled_source
-segment_glossary
-segment_pronoun_table
-segment_context
-metadata
-```
-
-Không nên gửi thêm `source_content` nếu đã có labeled_source.
-
-## 11.9. Release
-
-Chạy:
+Nếu bật Add to Calibre, tool gọi:
 
 ```bash
-python ln_release_builder.py
-```
-
-Build:
-
-```text
-volume_01.json
-volume_01_html/
+calibredb add <epub_path>
 ```
 
 ---
 
-# 12. Review policy
+## 15. Ghi chú hiện trạng
 
-## 12.1. Segment Glossary cần review khi
+Các điểm dưới đây là mô tả code hiện tại:
 
-```text
-missing_glossary_candidates không rỗng
-term quan trọng chưa có trong volume glossary
-model đề xuất variant lạ
-```
-
-## 12.2. Segment Pronoun cần review khi
-
-```text
-segment_override_candidates không rỗng
-missing_rules không rỗng
-speaker/listener quan trọng không có rule
-```
-
-## 12.3. Dialogue Labels cần review khi
-
-```text
-confidence < 0.72
-speaker = UNKNOWN
-listener = UNKNOWN
-possible_speakers nhiều hơn 1
-missing_pronoun_rule_units không rỗng
-```
-
-Confidence threshold hiện được chốt quanh:
-
-```text
-review_confidence_threshold = 0.72
-auto_accept_confidence_threshold = 0.82
-```
-
-Lý do:
-
-- Nếu threshold quá thấp, bỏ sót nhiều dòng mơ hồ.
-- Model thường “sợ sai” và hay cho confidence 0.5–0.6.
-- Nên bắt review vùng trung bình.
+* `requirements.txt` chưa liệt kê `ebooklib`, nhưng `release_builder.py` import `ebooklib.epub`.
+* CLI/API pipeline trong `src/pipeline.py` hiện không truyền `genre` vào `render()`, dù prompt có placeholder `{{genre}}`.
+* `prompts/08_label_dialogue.txt` có rule nhắc tới `units`, nhưng output schema chỉ có `labeled_source`.
+* `run.py` có nút mở `ln_pipeline_final_editor.py`, nhưng file này không có trong cây file root hiện tại của repo.
+* `config/config.json` có `dialogue_labeling` thresholds, và `label_dialogue()` truyền config này vào `INPUT_JSON`; schema output của prompt label dialogue hiện chỉ khai báo `item_id`, `chapter`, `segment`, `labeled_source`.
 
 ---
 
-# 13. Những quyết định quan trọng đã chốt
-
-## 13.1. Không dùng global memory của model
-
-Provider chat không có global memory. Tất cả context cần thiết phải nằm trong prompt.
-
-## 13.2. Không cố auto toàn bộ
-
-Workflow final là manual orchestration, không phải fully automated pipeline.
-
-## 13.3. Relationship canon là cấp volume
-
-Không nhập lại quan hệ cho từng segment.
-
-## 13.4. Segment pronoun là inherit + override
-
-Segment chỉ chứa rule đang dùng và ngoại lệ.
-
-## 13.5. Dialogue labeling là bước bắt buộc trước dịch
-
-Đây là lý do chính giúp xưng hô không còn loạn.
-
-## 13.6. Narration không cần label
-
-Chỉ dialogue cần speaker/listener label.
-
-## 13.7. QA/Fix optional
-
-Nếu bản dịch đã tốt, không cần chạy QA/Fix.  
-QA/Fix có thể dùng khi nghi ngờ lỗi hoặc muốn rà batch.
-
-## 13.8. Assemble local
-
-Ghép file và tạo HTML nên làm bằng Python, không cần AI.
-
----
-
-# 14. Các prompt quan trọng
-
-Tên prompt theo pipeline final:
+## 16. Workflow tổng quát
 
 ```text
-01_extract_volume_glossary.txt
-02_merge_volume_glossary.txt
-03_build_segment_glossary.txt
-04_extract_volume_relationships.txt
-05_merge_volume_relationships.txt
-06_build_segment_pronouns.txt
-07_build_segment_context.txt
-08_label_dialogue.txt
-09_translate_labeled_segment.txt
-10_qa_segment.txt
-11_fix_segment.txt
+source/volume_XX.json
+  ↓
+segments/volume_XX.segments.json
+  ↓
+extract-glossary
+  ↓
+merge-glossary
+  ↓
+approve-glossary
+  ↓
+build-segment-glossary
+  ↓
+extract-relationships
+  ↓
+merge-relationships
+  ↓
+approve-relationships
+  ↓
+build-segment-pronouns
+  ↓
+build-context
+  ↓
+label-dialogue
+  ↓
+translate
+  ↓
+assemble
+  ↓
+qa / fix / assemble --fixed nếu cần
 ```
 
-Sau patch cuối, cần chú ý nhất:
-
-## 14.1. `08_label_dialogue.txt`
-
-Phải có luật:
-
-```text
-Label ONLY dialogue lines.
-Do NOT label narration.
-Do NOT create [NARRATION] tags.
-labeled_source must preserve full segment content.
-Narration remains plain source text.
-units should contain dialogue units only.
-```
-
-## 14.2. `09_translate_labeled_segment.txt`
-
-Phải có luật:
-
-```text
-Plain unlabeled text = narration.
-Labeled lines = dialogue.
-Do NOT output labels.
-Use labels only to choose pronouns.
-Use segment_glossary exactly.
-Use segment_pronoun_table by speaker -> listener.
-Narration must keep stable third-person reference.
-```
-
----
-
-# 15. Những lỗi đã từng gặp và cách tránh
-
-## 15.1. Prompt translate bị phình gấp đôi
-
-Lỗi:
-
-```text
-gửi cả source_content và dialogue_labels.labeled_source
-```
-
-Cách tránh:
-
-```text
-translate chỉ gửi dialogue_labels.labeled_source
-```
-
-## 15.2. Narration bị gắn `[NARRATION]`
-
-Lỗi không nghiêm trọng nhưng tốn token và rối.
-
-Cách tránh:
-
-```text
-label only dialogue
-narration plain text
-```
-
-## 15.3. Model xóa dấu thoại
-
-Cần prompt dịch nhắc:
-
-```text
-Preserve dialogue punctuation and paragraph boundaries.
-Do not merge dialogue into narration.
-```
-
-## 15.4. Xưng hô quá cứng
-
-Có thể thêm `variants` vào relationship/pronoun rule:
-
-```json
-{
-  "self": "ta",
-  "other": "ngươi",
-  "variants": [
-    {
-      "self": "tôi",
-      "other": "cậu",
-      "usage": "khi câu thoại mềm hơn / riêng tư hơn",
-      "confidence": 0.78
-    }
-  ]
-}
-```
-
-Prompt dịch cần nói:
-
-```text
-Use primary pair as default.
-Variants may be used only when listed and local tone supports it.
-Do not randomly switch variants.
-```
-
-## 15.5. QA pass chung chung
-
-Nếu cần cải thiện QA, bắt QA trả checklist:
-
-```json
-{
-  "glossary_checked_count": 0,
-  "pronoun_rules_checked_count": 0,
-  "dialogue_units_checked_count": 0,
-  "suspicious_terms_found": []
-}
-```
-
-Hiện tại QA là optional nên chưa cần ưu tiên.
-
----
-
-# 16. Các app/tool hiện có
-
-## 16.1. Manual Prompt Studio v2
-
-Chức năng:
-
-```text
-- generate prompt
-- copy prompt
-- paste response
-- validate/import
-- edit artifacts
-- quản lý workflow manual
-```
-
-Chạy:
-
-```bash
-python manual_prompt_studio_v2.py
-```
-
-## 16.2. Final Editor
-
-Chức năng:
-
-```text
-- đọc/sửa glossary/pronoun/segment artifacts
-- bảng + JSON chi tiết
-- validate cơ bản
-```
-
-## 16.3. Release Builder
-
-Chức năng:
-
-```text
-- ghép translation JSONL thành JSON 3 biến
-- tạo HTML chương
-- tạo 0.html
-- chuẩn bị folder để đóng EPUB
-```
-
-Chạy:
-
-```bash
-python ln_release_builder.py
-```
-
----
-
-# 17. Kết quả test hiện tại
-
-Theo test thực tế:
-
-- Model chat provider mạnh hoàn thành merge volume rất nhanh.
-- Bản dịch sau workflow mới tốt hơn nhiều so với API DeepSeek cũ.
-- Narrator không còn nhầm ngôi kể.
-- Nhân vật không còn loạn xưng hô kiểu anh/em lung tung.
-- Bản release không còn label speaker.
-- QA test 8 segment đều pass.
-- Vấn đề còn lại chỉ là prompt tuning nhỏ:
-  - xưng hô hơi cứng nếu không có variants,
-  - model đôi lúc bỏ dấu thoại,
-  - cần giữ narration plain text không label.
-
-Chi phí test:
-
-```text
-~5 USD
-~15 triệu token
-```
-
-Được đánh giá là chấp nhận được.
-
----
-
-# 18. Checklist sang phiên làm việc mới
-
-Khi mở phiên mới, cần nắm các điểm sau:
-
-```text
-1. Đây không còn là pipeline API auto.
-2. Đây là manual prompt workflow dùng chat-only model.
-3. App chính là Manual Prompt Studio v2.
-4. Dữ liệu cốt lõi:
-   - volume glossary
-   - segment glossary
-   - volume relationship/pronoun canon
-   - segment pronoun table
-   - segment context
-   - dialogue labels
-   - translation
-5. Dialogue labeling là bước mấu chốt.
-6. Translate không gửi source_content trùng với labeled_source.
-7. Narration không gắn label.
-8. Release Builder xuất JSON 3 biến + HTML.
-```
-
----
-
-# 19. Quy trình ngắn gọn nhất hiện tại
-
-```text
-1. Chuẩn bị source + segments.
-2. Dùng Manual Prompt Studio:
-   - Extract/Merge/Approve Glossary
-   - Build Segment Glossary
-   - Extract/Merge/Approve Relationships
-   - Build Segment Pronouns
-   - Build Context
-   - Label Dialogue
-   - Translate
-3. Review những item flagged.
-4. Dùng Release Builder:
-   - xuất volume_XX.json
-   - xuất volume_XX_html/
-5. Đóng EPUB bằng workflow riêng.
-```
-
----
-
-# 20. Tư tưởng chốt
-
-Câu chốt của toàn bộ dự án:
-
-> Muốn dịch Light Novel tiếng Việt ổn bằng AI, không chỉ cần model mạnh.  
-> Cần một **lò luyện đan** đủ tốt: dữ liệu đúng, prompt đúng, thao tác đúng, và con người giữ quyền chuẩn hóa ở các điểm quan trọng.
-
-Pipeline final không cố thay thế hoàn toàn con người.
-
-Nó làm tốt hơn:
-
-```text
-App chuẩn bị nguyên liệu.
-Model chat mạnh luyện đan.
-Người dùng kiểm đan ở điểm quan trọng.
-Tool xuất bản đóng gói thành volume/HTML.
-```
-
-Đây là hướng hiện tại cho chất lượng tốt nhất.
+Pipeline dùng JSON và JSONL để lưu artifact. Các batch step nối dữ liệu bằng `item_id`; với segment record bình thường, `item_id` chính là field `segment`, ví dụ `c001_s001`.
