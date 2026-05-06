@@ -17,15 +17,17 @@ Rules:
 
 {{JSON_OUTPUT_POLICY}}
 
-Input:
-{{INPUT_JSON}}
-
-Return:
+Output:
 {
   "item_id": "",
   "chapter": 0,
   "segment": "",
-  "segment_pronoun_table": [{"speaker": "", "listener": "", "relationship": "", "self": "", "other": "", "variants": [{"self": "", "other": "", "relationship": "", "confidence": 0.0}], "source": "inherited_from_volume|segment_override|fallback", "notes": ""}],
-  "segment_override_candidates": [{"speaker": "", "listener": "", "self": "", "other": "", "reason": "", "confidence": 0.0}],
+  "segment_pronoun_table": [{"speaker": "", "listener": "", "relationship": "", "self": "", "other": "", "variants": [{"self": "", "other": "", "relationship": ""}], "source": "inherited_from_volume|segment_override|fallback", "notes": ""}],
+  "segment_override_candidates": [{"speaker": "", "listener": "", "self": "", "other": "", "reason": ""}],
   "missing_rules": [{"speaker": "", "listener": "", "reason": ""}]
 }
+
+Input:
+{{INPUT_JSON}}
+
+

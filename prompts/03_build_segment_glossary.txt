@@ -12,18 +12,20 @@ If a highly important term appears in the segment but is NOT in the `volume_glos
 
 {{JSON_OUTPUT_POLICY}}
 
-Input:
-{{INPUT_JSON}}
-
-Return:
+Output:
 {
   "item_id": "",
   "chapter": 0,
   "segment": "",
   "segment_glossary": [
-    {"id": "", "source": "", "vi": "", "type": "", "status": "confirmed|tentative", "notes": ""}
+    {"id": "", "source": "", "vi": "", "type": "", "aliases": [], "status": "confirmed|tentative", "notes": ""}
   ],
   "missing_glossary_candidates": [
     {"source": "", "suggested_vi": "", "reason": ""}
   ]
 }
+
+Input:
+{{INPUT_JSON}}
+
+

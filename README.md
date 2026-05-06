@@ -101,8 +101,9 @@ Dialogue Labeling
 Ví dụ:
 
 ```text
-[Elen -> Tigre | confidence=0.91]: 你终于来了。
-[Tigre -> Elen | confidence=0.88]: 我答应过你。
+[Elen -> Tigre]: 你终于来了。
+[Tigre -> Elen]: 我答应过你。
+[Tigre -> self]:
 ```
 
 Sau đó mới dịch. Nhờ vậy model dịch không còn phải tự đoán sân khấu.
@@ -271,13 +272,9 @@ Schema chính:
       "source": "",
       "vi": "",
       "type": "character|alias|title|epithet|location|organization|weapon|artifact|magic|skill|technique|named_attack|concept|other",
-      "status": "confirmed|tentative|conflict|deprecated",
       "aliases": [],
-      "variants": [],
-      "forbidden_translations": [],
-      "notes": "",
-      "appears_in": [],
-      "needs_human_review": false
+      "status": "confirmed|tentative|conflict|deprecated",
+      "notes": ""
     }
   ],
   "review_notes": []

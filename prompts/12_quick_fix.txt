@@ -14,11 +14,13 @@ Important Rules:
 
 {{JSON_OUTPUT_POLICY}}
 
-Input:
-{{INPUT_JSON}}
 
-Return:
+Output:
 {
   "new_translation_snippet": "",
   "reasoning": ""
 }
+
+Input:
+{{INPUT_JSON}}
+

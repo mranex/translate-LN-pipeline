@@ -8,8 +8,10 @@ Return the full corrected segment.
 
 {{JSON_OUTPUT_POLICY}}
 
+Output:
+{"item_id": "", "volume": 0, "chapter": 0, "segment": "", "fixed_translation": "", "applied_fixes": [], "remaining_concerns": []}
+
 Input:
 {{INPUT_JSON}}
 
-Return:
-{"item_id": "", "volume": 0, "chapter": 0, "segment": "", "fixed_translation": "", "applied_fixes": [], "remaining_concerns": []}
+

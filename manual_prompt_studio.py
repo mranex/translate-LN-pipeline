@@ -468,7 +468,7 @@ class App(tk.Tk):
         for term in vg:
             src = term.get('source', '')
             if src and src in content:
-                sg.append({'id': term.get('id', ''), 'source': src, 'vi': term.get('vi', ''), 'type': term.get('type', ''), 'status': term.get('status', 'tentative'), 'notes': term.get('notes', '')})
+                sg.append({'id': term.get('id', ''), 'source': src, 'vi': term.get('vi', ''), 'type': term.get('type', ''), 'status': term.get('status', 'tentative'), 'aliases': term.get('aliases', ''), 'notes': term.get('notes', '')})
         res = {'item_id': item_id, 'chapter': seg_data.get('chapter', 0), 'segment': seg_id, 'segment_glossary': sg, 'missing_glossary_candidates': []}
         self.imp_seg_gloss(res)
         self.reload(); self.status.set(f'Local segment glossary built with {len(sg)} terms.')

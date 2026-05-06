@@ -53,10 +53,7 @@ Style:
 
 {{JSON_OUTPUT_POLICY}}
 
-Input:
-{{INPUT_JSON}}
-
-Return:
+Output:
 {
   "item_id": "",
   "volume": 0,
@@ -66,3 +63,8 @@ Return:
   "translation": "",
   "translator_notes": []
 }
+
+Input:
+{{INPUT_JSON}}
+
+

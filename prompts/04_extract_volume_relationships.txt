@@ -23,16 +23,18 @@ Important:
 
 {{JSON_OUTPUT_POLICY}}
 
-Input:
-{{INPUT_JSON}}
-
-Return:
+Output:
 {
   "item_id": "",
   "chapter": 0,
   "segment": null,
   "relationship_candidates": [
-    {"speaker": "", "listener": "", "speaker_is_to_listener": "", "listener_is_to_speaker": "", "self": "", "other": "", "relationship": "", "confidence": 0.0}
+    {"speaker": "", "listener": "", "speaker_is_to_listener": "", "listener_is_to_speaker": "", "self": "", "other": "", "relationship": ""}
   ],
   "uncertain_pairs": []
 }
+
+
+Input:
+{{INPUT_JSON}}
+

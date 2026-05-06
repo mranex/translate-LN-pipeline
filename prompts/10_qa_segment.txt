@@ -19,8 +19,10 @@ Check:
 
 {{JSON_OUTPUT_POLICY}}
 
+Output:
+{"item_id": "", "volume": 0, "chapter": 0, "segment": "", "requires_fix": false, "max_severity": "none|low|medium|high|critical", "issues": [{"severity": "low|medium|high|critical", "type": "glossary|pronoun|speaker_label|meaning|tone|other", "source_excerpt": "", "translation_excerpt": "", "problem": "", "expected": "", "suggested_fix": "", "requires_fix": false}], "summary": ""}
+
 Input:
 {{INPUT_JSON}}
 
-Return:
-{"item_id": "", "volume": 0, "chapter": 0, "segment": "", "requires_fix": false, "max_severity": "none|low|medium|high|critical", "issues": [{"severity": "low|medium|high|critical", "type": "glossary|pronoun|speaker_label|meaning|tone|other", "source_excerpt": "", "translation_excerpt": "", "problem": "", "expected": "", "suggested_fix": "", "requires_fix": false}], "summary": ""}
+

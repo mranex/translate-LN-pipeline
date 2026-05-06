@@ -16,15 +16,15 @@ The labeled_source must preserve the full original segment content, but only dia
 Correct labeled_source style:
 城下，战姬静静地望着远方。
 
-[Elen -> Tigre | confidence=0.91]: 你终于来了。
+[Elen -> Tigre]: 你终于来了。
 
 Tigre握紧了手中的弓。
 
-[Tigre -> Elen | confidence=0.88]: 我答应过你。
+[Tigre -> Elen]: 我答应过你。
 
 Incorrect:
 [NARRATION]: 城下，战姬静静地望着远方。
-[Elen -> Tigre | confidence=0.91]: 你终于来了。
+[Elen -> Tigre]: 你终于来了。
 
 Use:
 - segment glossary
@@ -44,36 +44,22 @@ Rules:
 - Preserve paragraph breaks as much as possible.
 
 Label format examples:
-[Tigre -> Elen | confidence=0.91]: source dialogue
-[Elen -> GROUP | confidence=0.80]: source dialogue
-[UNKNOWN -> UNKNOWN | confidence=0.42]: source dialogue
+[Tigre -> self]: source dialogue
+[Tigre -> Elen]: source dialogue
+[Elen -> GROUP]: source dialogue
+[UNKNOWN -> UNKNOWN]: source dialogue
 
 {{JSON_OUTPUT_POLICY}}
 
-Input:
-{{INPUT_JSON}}
-
-Return:
+Output:
 {
   "item_id": "",
   "chapter": 0,
   "segment": "",
-  "labeled_source": "",
-  "units": [
-    {
-      "unit_id": "",
-      "type": "dialogue",
-      "source_text": "",
-      "speaker": null,
-      "listener": null,
-      "matching_pronoun_rule": null,
-      "confidence": 0.0,
-      "reason": ""
-    }
-  ],
-  "label_report": {
-    "low_confidence_units": [],
-    "unknown_units": [],
-    "missing_pronoun_rule_units": []
-  }
+  "labeled_source": ""
 }
+
+Input:
+{{INPUT_JSON}}
+
+

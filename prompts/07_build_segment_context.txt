@@ -8,8 +8,10 @@ Use the segment glossary and segment pronoun table.
 
 {{JSON_OUTPUT_POLICY}}
 
+Output:
+{"item_id": "", "chapter": 0, "segment": "", "context": {"appearing_characters": [], "scene_summary": "", "scene_type": "battlefield|private_conversation|court|travel|daily_life|action|comedy|inner_monologue|strategy|other", "tone": "", "translation_notes": []}}
+
 Input:
 {{INPUT_JSON}}
 
-Return:
-{"item_id": "", "chapter": 0, "segment": "", "context": {"appearing_characters": [], "scene_summary": "", "scene_type": "battlefield|private_conversation|court|travel|daily_life|action|comedy|inner_monologue|strategy|other", "tone": "", "translation_notes": []}}
+

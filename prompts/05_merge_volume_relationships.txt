@@ -23,14 +23,16 @@ Status rules:
 
 {{JSON_OUTPUT_POLICY}}
 
-Input:
-{{INPUT_JSON}}
-
-Return:
+Output:
 {
   "volume": 0,
   "relationship_pronoun_canon": [
-    {"id": "", "speaker": "", "listener": "", "relationship": "", "self": "", "other": "", "scope": "volume_default", "status": "confirmed|tentative", "variants": [{"self": "", "other": "", "relationship": "", "confidence": 0.0}], "notes": ""}
+    {"id": "", "speaker": "", "listener": "", "relationship": "", "self": "", "other": "", "scope": "volume_default", "status": "confirmed|tentative", "variants": [{"self": "", "other": "", "relationship": ""}], "notes": ""}
   ],
   "review_notes": []
 }
+
+
+Input:
+{{INPUT_JSON}}
+
