@@ -27,7 +27,7 @@ class ProjectProgressPage(QWidget):
         self.progress_service = ProgressService(placeholder_workspace)
         self.project_index = ProjectIndex(workspace) if workspace is not None else None
         self.current_context: SelectionContext | None = None
-        self.current_selected_id = "No selection"
+        self.current_selected_id = "Chưa chọn"
         self._build_ui()
         self.refresh_project_data()
 
@@ -37,7 +37,7 @@ class ProjectProgressPage(QWidget):
         self.project_index = ProjectIndex(workspace)
         self.refresh_project_data()
 
-    def set_selection_context(self, context: SelectionContext | None, selected_id: str = "No selection") -> None:
+    def set_selection_context(self, context: SelectionContext | None, selected_id: str = "Chưa chọn") -> None:
         self.current_context = context
         self.current_selected_id = selected_id
         if context is not None:
@@ -52,7 +52,7 @@ class ProjectProgressPage(QWidget):
         try:
             self.volume_combo.clear()
             for volume in volumes:
-                self.volume_combo.addItem(f"Volume {volume:02d}", volume)
+                self.volume_combo.addItem(f"Tập {volume:02d}", volume)
         finally:
             self.volume_combo.blockSignals(False)
 
@@ -62,66 +62,71 @@ class ProjectProgressPage(QWidget):
                 self._set_volume_value(target_volume)
             else:
                 self.volume_combo.setCurrentIndex(0)
-            self.status_label.setText(f"Loaded {len(volumes)} volume(s) for progress tracking.")
+            self.status_label.setText(f"Đã tải {len(volumes)} tập để theo dõi tiến độ.")
         else:
-            self.status_label.setText("No source volumes were found for this project.")
+            self.status_label.setText("Không tìm thấy tập dữ liệu gốc nào trong dự án này.")
 
         self.refresh_current_view()
 
     def refresh_current_view(self) -> None:
         context = self._effective_context()
         if context is None:
-            self.context_value.setText("No selection")
-            self.summary_scope_value.setText("none")
+            self.context_value.setText("Chưa chọn")
+            self.summary_scope_value.setText("không có")
             self.progress_table.set_progress([])
             self._set_summary([])
             return
 
         rows = self._progress_rows_for_context(context)
-        selected_id = self.current_selected_id if self.current_context is not None else f"Volume {context.volume:02d}"
+        selected_id = self.current_selected_id if self.current_context is not None else f"Tập {context.volume:02d}"
         self.context_value.setText(selected_id)
-        self.summary_scope_value.setText(context.scope)
+        
+        # Việt hóa tên phạm vi lọc
+        scope_display = "Tập" if context.scope == "volume" else ("Chương" if context.scope == "chapter" else "Phân đoạn")
+        self.summary_scope_value.setText(scope_display)
+        
         self.progress_table.set_progress(rows)
         self._set_summary(rows)
-        self.status_message.emit(f"Loaded progress for {context.scope} in volume {context.volume:02d}.")
+        self.status_message.emit(f"Đã tải tiến độ cho {scope_display} thuộc Tập {context.volume:02d}.")
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        title = QLabel("Project Progress")
+        title = QLabel("Tiến Độ Dự Án")
         title.setObjectName("titleLabel")
         layout.addWidget(title)
 
         controls = QHBoxLayout()
-        controls.addWidget(QLabel("Volume"))
+        controls.addWidget(QLabel("Tập truyện"))
         self.volume_combo = QComboBox()
         self.volume_combo.currentIndexChanged.connect(self._on_volume_changed)
         controls.addWidget(self.volume_combo)
         controls.addSpacing(12)
-        scope_label = QLabel("Current filter")
+        scope_label = QLabel("Bộ lọc hiện tại")
         scope_label.setObjectName("mutedLabel")
         controls.addWidget(scope_label)
-        self.summary_scope_value = QLabel("none")
+        self.summary_scope_value = QLabel("không có")
         self.summary_scope_value.setObjectName("mutedLabel")
         controls.addWidget(self.summary_scope_value)
         controls.addSpacing(12)
-        selected_label = QLabel("Selected ID")
+        selected_label = QLabel("Mã đang chọn")
         selected_label.setObjectName("mutedLabel")
         controls.addWidget(selected_label)
-        self.context_value = QLabel("No selection")
+        self.context_value = QLabel("Chưa chọn")
         self.context_value.setObjectName("mutedLabel")
         controls.addWidget(self.context_value, 1)
-        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button = QPushButton("Làm Mới")
+        self.refresh_button.setObjectName("aiButton")
         self.refresh_button.clicked.connect(self.refresh_project_data)
         controls.addWidget(self.refresh_button)
         layout.addLayout(controls)
 
         summary_row = QHBoxLayout()
-        self.total_steps_label = QLabel("Total steps: 0")
-        self.done_steps_label = QLabel("Done: 0")
-        self.partial_steps_label = QLabel("Partial: 0")
-        self.not_started_steps_label = QLabel("Not started: 0")
-        self.missing_source_label = QLabel("Missing source: 0")
+        self.total_steps_label = QLabel("Tổng số bước: 0")
+        self.done_steps_label = QLabel("🟢 Đã chốt: 0")
+        self.partial_steps_label = QLabel("🟡 Đang dịch: 0")
+        self.not_started_steps_label = QLabel("⚪ Chưa bắt đầu: 0")
+        self.missing_source_label = QLabel("🔴 Thiếu gốc: 0")
         for label in (
             self.total_steps_label,
             self.done_steps_label,
@@ -134,7 +139,7 @@ class ProjectProgressPage(QWidget):
         summary_row.addStretch(1)
         layout.addLayout(summary_row)
 
-        self.status_label = QLabel("Select a project item to inspect progress.")
+        self.status_label = QLabel("Chọn một thư mục tập/chương/đoạn bên trái để xem tiến trình chi tiết.")
         self.status_label.setObjectName("mutedLabel")
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
@@ -179,16 +184,16 @@ class ProjectProgressPage(QWidget):
         not_started_steps = sum(1 for row in rows if row.status == "not_started")
         missing_source = sum(1 for row in rows if row.status == "missing_source")
 
-        self.total_steps_label.setText(f"Total steps: {total_steps}")
-        self.done_steps_label.setText(f"Done: {done_steps}")
-        self.partial_steps_label.setText(f"Partial: {partial_steps}")
-        self.not_started_steps_label.setText(f"Not started: {not_started_steps}")
-        self.missing_source_label.setText(f"Missing source: {missing_source}")
+        self.total_steps_label.setText(f"Tổng số bước: {total_steps}")
+        self.done_steps_label.setText(f"🟢 Đã chốt: {done_steps}")
+        self.partial_steps_label.setText(f"🟡 Đang dịch: {partial_steps}")
+        self.not_started_steps_label.setText(f"⚪ Chưa bắt đầu: {not_started_steps}")
+        self.missing_source_label.setText(f"🔴 Thiếu gốc: {missing_source}")
 
     def _on_volume_changed(self) -> None:
         volume = self._selected_volume()
         if volume is None:
             return
         self.current_context = SelectionContext(scope="volume", volume=volume)
-        self.current_selected_id = f"Volume {volume:02d}"
+        self.current_selected_id = f"Tập {volume:02d}"
         self.refresh_current_view()

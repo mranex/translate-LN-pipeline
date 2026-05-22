@@ -17,7 +17,7 @@ class StepSelectorWidget(QWidget):
         self.combo.blockSignals(True)
         self.combo.clear()
         for step in steps:
-            mode = "Local Action" if step.is_local_action else "Prompt Step"
+            mode = "Tiến Trình Nội Bộ" if step.is_local_action else "Bước Prompt AI"
             label = f"{step.label} [{mode}]"
             self.combo.addItem(label, step)
         self.combo.blockSignals(False)
@@ -48,7 +48,7 @@ class StepSelectorWidget(QWidget):
         self.combo.currentIndexChanged.connect(self._on_selection_changed)
         layout.addWidget(self.combo)
 
-        self.meta_label = QLabel("No step selected.")
+        self.meta_label = QLabel("Chưa chọn bước thực hiện nào.")
         self.meta_label.setObjectName("mutedLabel")
         self.meta_label.setWordWrap(True)
         layout.addWidget(self.meta_label)
@@ -60,8 +60,8 @@ class StepSelectorWidget(QWidget):
     def _update_metadata(self) -> None:
         step = self.selected_step()
         if step is None:
-            self.meta_label.setText("No step selected.")
+            self.meta_label.setText("Chưa chọn bước thực hiện nào.")
             return
-        mode = "Local Action" if step.is_local_action else "Prompt Step"
-        artifact_mode = "writes artifact" if step.writes_artifact else "no artifact write"
-        self.meta_label.setText(f"ID: {step.id} | Scope: {step.scope} | Type: {mode} | {artifact_mode}")
+        mode = "Tiến Trình Nội Bộ" if step.is_local_action else "Bước Prompt AI"
+        artifact_mode = "Ghi Dữ Liệu" if step.writes_artifact else "Không Ghi Dữ Liệu"
+        self.meta_label.setText(f"Mã: {step.id} | Phạm vi: {step.scope} | Loại: {mode} | {artifact_mode}")

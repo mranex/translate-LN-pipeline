@@ -40,7 +40,7 @@ class ColumnSpec:
     kind: str = "text"
 
 
-CANON_FILTER_OPTIONS = ("All", "In Series", "New to Series", "Conflict", "Needs Review")
+CANON_FILTER_OPTIONS = ("Tất cả", "Trong series", "Thêm mới", "Xung đột", "Cần kiểm tra")
 
 
 class CanonStatusLens:
@@ -57,13 +57,13 @@ class CanonStatusLens:
         conflict = self._has_glossary_conflict(volume, entry)
         flags: list[str] = []
         if conflict:
-            flags.append("Conflict")
+            flags.append("Xung đột")
         if in_series:
-            flags.append("In Series")
+            flags.append("Trong series")
         else:
-            flags.append("New to Series")
+            flags.append("Thêm mới")
         if bool(entry.get("needs_human_review")):
-            flags.append("Needs Review")
+            flags.append("Cần kiểm tra")
         return flags
 
     def relationship_flags(self, volume: int | None, entry: dict[str, Any]) -> list[str]:
@@ -71,13 +71,13 @@ class CanonStatusLens:
         conflict = self._has_relationship_conflict(volume, entry)
         flags: list[str] = []
         if conflict:
-            flags.append("Conflict")
+            flags.append("Xung đột")
         if in_series:
-            flags.append("In Series")
+            flags.append("Trong series")
         else:
-            flags.append("New to Series")
+            flags.append("Thêm mới")
         if bool(entry.get("needs_human_review")):
-            flags.append("Needs Review")
+            flags.append("Cần kiểm tra")
         return flags
 
     def find_glossary_series_index(self, entry: dict[str, Any]) -> int | None:
@@ -276,7 +276,7 @@ class EditableVolumeTableTab(QWidget):
             self._set_controls_enabled(False)
             self._set_dirty(False)
             self.message_label.setText(
-                f"The loaded {self.artifact_label.lower()} is missing a valid '{self.list_key}' list."
+                f"Tệp {self.artifact_label.lower()} đã nạp thiếu danh sách '{self.list_key}' hợp lệ."
             )
             self.object_selected.emit(None)
             return
@@ -307,15 +307,19 @@ class EditableVolumeTableTab(QWidget):
         layout = QVBoxLayout(self)
 
         button_row = QHBoxLayout()
-        self.add_row_button = QPushButton("Add Row")
-        self.duplicate_row_button = QPushButton("Duplicate Row")
-        self.delete_row_button = QPushButton("Delete Row")
-        self.save_button = QPushButton("Save Draft")
-        self.reload_button = QPushButton("Reload/Revert")
+        self.add_row_button = QPushButton("Thêm Dòng")
+        self.duplicate_row_button = QPushButton("Nhân Bản Dòng")
+        self.delete_row_button = QPushButton("Xóa Dòng")
+        self.delete_row_button.setObjectName("dangerButton")
+        self.save_button = QPushButton("Lưu Bản Nháp")
+        self.save_button.setObjectName("aiButton")
+        self.reload_button = QPushButton("Nạp Lại/Hoàn Tác")
         self.approve_button = QPushButton(self.approve_button_text)
+        self.approve_button.setObjectName("aiButton")
         self.filter_combo = QComboBox()
         self.filter_combo.addItems(list(CANON_FILTER_OPTIONS))
-        self.open_in_series_button = QPushButton("Open in Series Canon")
+        self.open_in_series_button = QPushButton("Mở trong Canon Series")
+        self.open_in_series_button.setObjectName("aiButton")
         self.add_row_button.clicked.connect(self._add_row)
         self.duplicate_row_button.clicked.connect(self._duplicate_row)
         self.delete_row_button.clicked.connect(self._delete_row)
@@ -333,7 +337,7 @@ class EditableVolumeTableTab(QWidget):
             self.approve_button,
         ):
             button_row.addWidget(button)
-        button_row.addWidget(QLabel("Filter"))
+        button_row.addWidget(QLabel("Bộ lọc"))
         button_row.addWidget(self.filter_combo)
         button_row.addWidget(self.open_in_series_button)
         button_row.addStretch(1)
@@ -432,14 +436,14 @@ class EditableVolumeTableTab(QWidget):
         rows = self._row_list()
         row_index = self.table.currentRow()
         if rows is None or not (0 <= row_index < len(rows)) or not isinstance(rows[row_index], dict):
-            return None, f"Select a {self.raw_edit_title.lower()} row to edit it as raw JSON."
+            return None, f"Hãy chọn một dòng {self.raw_edit_title.lower()} để sửa bằng JSON thô."
         return (
             RawEditTarget(
                 title=self.raw_edit_title,
                 obj=copy.deepcopy(rows[row_index]),
                 selection_key=f"{self.artifact_label}:{row_index}",
                 apply_callback=lambda obj, target_index=row_index: self._apply_raw_edit_at_index(target_index, obj),
-                message="Applied changes stay in memory until you save this tab.",
+                message="Các thay đổi được lưu tạm trong bộ nhớ cho đến khi bạn bấm Lưu.",
             ),
             "",
         )
@@ -448,22 +452,22 @@ class EditableVolumeTableTab(QWidget):
         rows = self._row_list()
         row_index = self.table.currentRow()
         if rows is None or not (0 <= row_index < len(rows)):
-            raise ValueError(f"Select a {self.raw_edit_title.lower()} row before applying raw JSON.")
+            raise ValueError(f"Hãy chọn một dòng {self.raw_edit_title.lower()} trước khi áp dụng JSON thô.")
         return self._apply_raw_edit_at_index(row_index, obj)
 
     def _apply_raw_edit_at_index(self, row_index: int, obj: dict[str, Any] | list[Any]) -> str:
         if not isinstance(obj, dict):
-            raise ValueError("Expected a JSON object for this selection.")
+            raise ValueError("Yêu cầu một đối tượng JSON cho mục này.")
         rows = self._row_list()
         if rows is None or not (0 <= row_index < len(rows)):
-            raise ValueError(f"Select a {self.raw_edit_title.lower()} row before applying raw JSON.")
+            raise ValueError(f"Hãy chọn một dòng {self.raw_edit_title.lower()} trước khi áp dụng JSON thô.")
         rows[row_index] = copy.deepcopy(obj)
         self._rebuild_table(rows)
         self._refresh_canon_overlay()
         self.table.selectRow(row_index)
         self._set_dirty(True)
         self.object_selected.emit(rows[row_index])
-        return f"Applied in memory. Click Save Draft to write the {self.artifact_label.lower()} artifact."
+        return f"Đã áp dụng vào bộ nhớ tạm. Hãy bấm Lưu Bản Nháp để ghi tệp dữ liệu {self.artifact_label.lower()}."
 
     def _add_row(self) -> None:
         rows = self._row_list()
@@ -474,26 +478,26 @@ class EditableVolumeTableTab(QWidget):
         self._refresh_canon_overlay()
         self.table.selectRow(len(rows) - 1)
         self._set_dirty(True)
-        self.status_message.emit(f"Added a new row to {self.artifact_label.lower()}.")
+        self.status_message.emit(f"Đã thêm dòng mới vào {self.artifact_label.lower()}.")
 
     def _duplicate_row(self) -> None:
         rows = self._row_list()
         row_index = self.table.currentRow()
         if rows is None or not (0 <= row_index < len(rows)):
-            self.status_message.emit("Select a row to duplicate.")
+            self.status_message.emit("Hãy chọn một dòng để nhân bản.")
             return
         rows.insert(row_index + 1, copy.deepcopy(rows[row_index]))
         self._rebuild_table(rows)
         self._refresh_canon_overlay()
         self.table.selectRow(row_index + 1)
         self._set_dirty(True)
-        self.status_message.emit(f"Duplicated a row in {self.artifact_label.lower()}.")
+        self.status_message.emit(f"Đã nhân bản dòng trong {self.artifact_label.lower()}.")
 
     def _delete_row(self) -> None:
         rows = self._row_list()
         row_index = self.table.currentRow()
         if rows is None or not (0 <= row_index < len(rows)):
-            self.status_message.emit("Select a row to delete.")
+            self.status_message.emit("Hãy chọn một dòng để xóa.")
             return
         rows.pop(row_index)
         self._rebuild_table(rows)
@@ -501,21 +505,21 @@ class EditableVolumeTableTab(QWidget):
         if rows:
             self.table.selectRow(min(row_index, len(rows) - 1))
         self._set_dirty(True)
-        self.status_message.emit(f"Deleted a row from {self.artifact_label.lower()}.")
+        self.status_message.emit(f"Đã xóa một dòng khỏi {self.artifact_label.lower()}.")
 
     def _reload(self) -> None:
-        if not self.resolve_unsaved_changes(self, "reloading this tab"):
+        if not self.resolve_unsaved_changes(self, "tải lại Tab"):
             return
         self.reload_requested.emit()
 
     def _save_draft(self, show_success: bool, emit_change: bool) -> bool:
         if self.current_volume is None or self.artifact is None:
-            self.status_message.emit(f"{self.artifact_label} is not available for saving.")
+            self.status_message.emit(f"Không thể lưu vì {self.artifact_label} không khả dụng.")
             return False
         try:
             result = self.save_callback(self.current_volume, copy.deepcopy(self.artifact))
         except Exception as exc:
-            QMessageBox.critical(self, "Save Draft Failed", str(exc))
+            QMessageBox.critical(self, "Lưu Bản Nháp Thất Bại", str(exc))
             self.status_message.emit(str(exc))
             return False
 
@@ -528,10 +532,10 @@ class EditableVolumeTableTab(QWidget):
 
     def _approve(self) -> None:
         if self.current_volume is None:
-            self.status_message.emit(f"{self.artifact_label} is not available for approval.")
+            self.status_message.emit(f"Không thể duyệt vì {self.artifact_label} không khả dụng.")
             return
         if self._dirty:
-            choice = self._save_before_continue_choice(self, "Save the current draft before approving?")
+            choice = self._save_before_continue_choice(self, "Bạn có muốn lưu bản nháp hiện tại trước khi duyệt không?")
             if choice != QMessageBox.StandardButton.Save:
                 return
             if not self._save_draft(show_success=False, emit_change=False):
@@ -540,7 +544,7 @@ class EditableVolumeTableTab(QWidget):
         confirm = QMessageBox.question(
             self,
             self.approve_button_text,
-            f"Approve the current {self.artifact_label.lower()} draft into the finalized artifact?",
+            f"Bạn có chắc chắn muốn duyệt bản nháp {self.artifact_label.lower()} hiện tại thành tệp dữ liệu chính thức không?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
         )
@@ -550,7 +554,7 @@ class EditableVolumeTableTab(QWidget):
         try:
             result = self.approve_callback(self.current_volume)
         except Exception as exc:
-            QMessageBox.critical(self, "Approve Failed", str(exc))
+            QMessageBox.critical(self, "Duyệt Thất Bại", str(exc))
             self.status_message.emit(str(exc))
             return
 
@@ -633,9 +637,9 @@ class EditableVolumeTableTab(QWidget):
             item.setText(", ".join(flags))
 
     def _apply_filter(self) -> None:
-        selected_filter = self.filter_combo.currentText().strip() or "All"
+        selected_filter = self.filter_combo.currentText().strip() or "Tất cả"
         for row_index, flags in enumerate(self._canon_flags_by_row):
-            visible = selected_filter == "All" or selected_filter in flags
+            visible = selected_filter == "Tất cả" or selected_filter in flags
             self.table.setRowHidden(row_index, not visible)
         current_row = self.table.currentRow()
         if 0 <= current_row < len(self._canon_flags_by_row) and not self.table.isRowHidden(current_row):
@@ -650,16 +654,16 @@ class EditableVolumeTableTab(QWidget):
         rows = self._row_list()
         row_index = self.table.currentRow()
         if self.current_volume is None or rows is None or not (0 <= row_index < len(rows)):
-            self.status_message.emit("Select a canon row before opening it in Series Canon.")
+            self.status_message.emit("Hãy chọn một dòng trước khi mở trong Canon Series.")
             return
         self.open_series_canon_requested.emit(self.canon_kind, copy.deepcopy(rows[row_index]), self.current_volume)
 
     def _unsaved_choice(self, parent: QWidget, reason: str) -> QMessageBox.StandardButton:
         box = QMessageBox(parent)
         box.setIcon(QMessageBox.Icon.Warning)
-        box.setWindowTitle("Unsaved Changes")
-        box.setText(f"{self.artifact_label} has unsaved changes.")
-        box.setInformativeText(f"What would you like to do before {reason}?")
+        box.setWindowTitle("Thay Đổi Chưa Lưu")
+        box.setText(f"{self.artifact_label} có các thay đổi chưa được lưu.")
+        box.setInformativeText(f"Bạn muốn thực hiện thao tác nào trước khi {reason}?")
         box.setStandardButtons(
             QMessageBox.StandardButton.Save
             | QMessageBox.StandardButton.Discard
@@ -671,8 +675,8 @@ class EditableVolumeTableTab(QWidget):
     def _save_before_continue_choice(self, parent: QWidget, message: str) -> QMessageBox.StandardButton:
         box = QMessageBox(parent)
         box.setIcon(QMessageBox.Icon.Warning)
-        box.setWindowTitle("Unsaved Changes")
-        box.setText(f"{self.artifact_label} has unsaved changes.")
+        box.setWindowTitle("Thay Đổi Chưa Lưu")
+        box.setText(f"{self.artifact_label} có các thay đổi chưa được lưu.")
         box.setInformativeText(message)
         box.setStandardButtons(QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Cancel)
         box.setDefaultButton(QMessageBox.StandardButton.Save)
@@ -755,7 +759,7 @@ class EditableSegmentJsonlTab(QWidget):
             self._load_segment(preferred_segment_id, quiet=True)
         else:
             self._canon_flags_by_row = []
-            self._clear_detail("Select a segment summary row to edit its artifact details.")
+            self._clear_detail("Hãy chọn một dòng trong Bảng Tổng Quan để chỉnh sửa chi tiết.")
 
     def has_unsaved_changes(self) -> bool:
         return self._dirty
@@ -779,7 +783,7 @@ class EditableSegmentJsonlTab(QWidget):
         self.message_label.setWordWrap(True)
         layout.addWidget(self.message_label)
 
-        layout.addWidget(QLabel("Summary"))
+        layout.addWidget(QLabel("Bảng Tổng Quan"))
         self.summary_table = QTableWidget(0, len(self.summary_columns))
         self.summary_table.setHorizontalHeaderLabels([label for _key, label in self.summary_columns])
         self.summary_table.setAlternatingRowColors(False)
@@ -796,14 +800,14 @@ class EditableSegmentJsonlTab(QWidget):
         layout.addWidget(self.summary_table, 1)
 
         detail_header = QHBoxLayout()
-        detail_header.addWidget(QLabel("Editing Segment"))
-        self.segment_label = QLabel("No segment selected")
+        detail_header.addWidget(QLabel("Đang Sửa Phân Đoạn:"))
+        self.segment_label = QLabel("Chưa chọn phân đoạn")
         self.segment_label.setObjectName("mutedLabel")
         detail_header.addWidget(self.segment_label)
         detail_header.addStretch(1)
         layout.addLayout(detail_header)
 
-        self.detail_status_label = QLabel("Select a segment summary row to edit its artifact details.")
+        self.detail_status_label = QLabel("Hãy chọn một dòng trong Bảng Tổng Quan để chỉnh sửa chi tiết.")
         self.detail_status_label.setObjectName("mutedLabel")
         self.detail_status_label.setWordWrap(True)
         layout.addWidget(self.detail_status_label)
@@ -812,11 +816,14 @@ class EditableSegmentJsonlTab(QWidget):
         self.add_button = QPushButton(self.add_button_text)
         self.duplicate_button = QPushButton(self.duplicate_button_text)
         self.delete_button = QPushButton(self.delete_button_text)
+        self.delete_button.setObjectName("dangerButton")
         self.save_button = QPushButton(self.save_button_text)
-        self.reload_button = QPushButton("Reload/Revert")
+        self.save_button.setObjectName("aiButton")
+        self.reload_button = QPushButton("Nạp Lại/Hoàn Tác")
         self.filter_combo = QComboBox()
         self.filter_combo.addItems(list(CANON_FILTER_OPTIONS))
-        self.open_in_series_button = QPushButton("Open in Series Canon")
+        self.open_in_series_button = QPushButton("Mở trong Canon Series")
+        self.open_in_series_button.setObjectName("aiButton")
         self.add_button.clicked.connect(self._add_entry)
         self.duplicate_button.clicked.connect(self._duplicate_entry)
         self.delete_button.clicked.connect(self._delete_entry)
@@ -826,7 +833,7 @@ class EditableSegmentJsonlTab(QWidget):
         self.open_in_series_button.clicked.connect(self._open_in_series_canon)
         for button in (self.add_button, self.duplicate_button, self.delete_button, self.save_button, self.reload_button):
             button_row.addWidget(button)
-        button_row.addWidget(QLabel("Filter"))
+        button_row.addWidget(QLabel("Bộ lọc"))
         button_row.addWidget(self.filter_combo)
         button_row.addWidget(self.open_in_series_button)
         button_row.addStretch(1)
@@ -905,14 +912,14 @@ class EditableSegmentJsonlTab(QWidget):
             self._emit_detail_object()
             return
         previous_segment_id = self.current_segment_id
-        if self._dirty and not self.resolve_unsaved_changes(self, f"loading segment {segment_id}"):
+        if self._dirty and not self.resolve_unsaved_changes(self, f"nạp phân đoạn {segment_id}"):
             self._select_summary_row(previous_segment_id)
             return
         self._load_segment(segment_id, quiet=False)
 
     def _load_segment(self, segment_id: str, quiet: bool) -> None:
         if self.current_volume is None:
-            self._clear_detail("A volume must be selected before segment editing is available.")
+            self._clear_detail("Bạn cần chọn một Tập trước khi chỉnh sửa phân đoạn.")
             return
         try:
             loaded = self.load_callback(self.current_volume, segment_id)
@@ -920,7 +927,7 @@ class EditableSegmentJsonlTab(QWidget):
             self._clear_detail(str(exc))
             self.status_message.emit(str(exc))
             if not quiet:
-                QMessageBox.critical(self, f"{self.artifact_label} Load Failed", str(exc))
+                QMessageBox.critical(self, f"Nạp {self.artifact_label} Thất Bại", str(exc))
             return
 
         self.current_segment_id = loaded.item_id
@@ -929,9 +936,9 @@ class EditableSegmentJsonlTab(QWidget):
         self.current_list_key, entries = self.list_getter(self.current_result)
         self.segment_label.setText(loaded.item_id)
         if loaded.exists:
-            self.detail_status_label.setText(loaded.message or "Editing the saved artifact row for this segment.")
+            self.detail_status_label.setText(loaded.message or "Đang chỉnh sửa dòng dữ liệu đã lưu cho phân đoạn này.")
         else:
-            self.detail_status_label.setText(loaded.message or "Editing an in-memory result until save.")
+            self.detail_status_label.setText(loaded.message or "Đang chỉnh sửa kết quả tạm thời trong bộ nhớ cho đến khi Lưu.")
         self._rebuild_detail_table(entries)
         self._refresh_canon_overlay()
         self._set_detail_controls_enabled(True)
@@ -944,7 +951,7 @@ class EditableSegmentJsonlTab(QWidget):
         self.current_result = None
         self.current_list_key = None
         self._canon_flags_by_row = []
-        self.segment_label.setText("No segment selected")
+        self.segment_label.setText("Chưa chọn phân đoạn")
         self.detail_status_label.setText(message)
         self._rebuild_detail_table([])
         self._set_detail_controls_enabled(False)
@@ -1049,7 +1056,7 @@ class EditableSegmentJsonlTab(QWidget):
         entries = self._entries()
         row_index = self.detail_table.currentRow()
         if entries is None or not (0 <= row_index < len(entries)) or not isinstance(entries[row_index], dict):
-            return None, f"Select a detail row to edit a {self.raw_edit_title.lower()} as raw JSON."
+            return None, f"Hãy chọn một dòng chi tiết để sửa {self.raw_edit_title.lower()} dưới dạng JSON thô."
         return (
             RawEditTarget(
                 title=self.raw_edit_title,
@@ -1060,7 +1067,7 @@ class EditableSegmentJsonlTab(QWidget):
                     target_index,
                     obj,
                 ),
-                message="Applied changes stay in memory until you use this tab's Save button.",
+                message="Thay đổi được áp dụng vào bộ nhớ tạm cho đến khi bấm Lưu trong Tab.",
             ),
             "",
         )
@@ -1069,7 +1076,7 @@ class EditableSegmentJsonlTab(QWidget):
         entries = self._entries()
         row_index = self.detail_table.currentRow()
         if entries is None or not (0 <= row_index < len(entries)):
-            raise ValueError(f"Select a detail row before applying raw JSON to this {self.raw_edit_title.lower()}.")
+            raise ValueError(f"Hãy chọn một dòng chi tiết trước khi áp dụng JSON thô cho {self.raw_edit_title.lower()}.")
         return self._apply_raw_edit_at_index(self.current_segment_id, row_index, obj)
 
     def _apply_raw_edit_at_index(
@@ -1079,50 +1086,50 @@ class EditableSegmentJsonlTab(QWidget):
         obj: dict[str, Any] | list[Any],
     ) -> str:
         if not isinstance(obj, dict):
-            raise ValueError("Expected a JSON object for this selection.")
+            raise ValueError("Yêu cầu một đối tượng JSON cho mục này.")
         if expected_segment_id is not None and self.current_segment_id != expected_segment_id:
-            raise ValueError("The selected segment changed before this raw edit could be applied. Re-select the original row or reset the panel.")
+            raise ValueError("Phân đoạn đã bị thay đổi trước khi áp dụng JSON. Hãy chọn lại dòng ban đầu hoặc đặt lại bảng.")
         entries = self._entries()
         if entries is None or not (0 <= row_index < len(entries)):
-            raise ValueError(f"Select a detail row before applying raw JSON to this {self.raw_edit_title.lower()}.")
+            raise ValueError(f"Hãy chọn một dòng chi tiết trước khi áp dụng JSON thô cho {self.raw_edit_title.lower()}.")
         entries[row_index] = copy.deepcopy(obj)
         self._rebuild_detail_table(entries)
         self._refresh_canon_overlay()
         self.detail_table.selectRow(row_index)
         self._set_dirty(True)
         self.object_selected.emit(entries[row_index])
-        return f"Applied in memory. Click Save to write the {self.artifact_label.lower()} artifact."
+        return f"Đã áp dụng vào bộ nhớ tạm. Hãy bấm Lưu để ghi tệp dữ liệu {self.artifact_label.lower()}."
 
     def _add_entry(self) -> None:
         entries = self._entries()
         if entries is None:
-            self.status_message.emit("Select a segment before adding entries.")
+            self.status_message.emit("Hãy chọn một phân đoạn trước khi thêm mục mới.")
             return
         entries.append(self.default_entry_factory())
         self._rebuild_detail_table(entries)
         self._refresh_canon_overlay()
         self.detail_table.selectRow(len(entries) - 1)
         self._set_dirty(True)
-        self.status_message.emit(f"Added a new item to {self.artifact_label.lower()}.")
+        self.status_message.emit(f"Đã thêm mục mới vào {self.artifact_label.lower()}.")
 
     def _duplicate_entry(self) -> None:
         entries = self._entries()
         row_index = self.detail_table.currentRow()
         if entries is None or not (0 <= row_index < len(entries)):
-            self.status_message.emit("Select a row to duplicate.")
+            self.status_message.emit("Hãy chọn một dòng để nhân bản.")
             return
         entries.insert(row_index + 1, copy.deepcopy(entries[row_index]))
         self._rebuild_detail_table(entries)
         self._refresh_canon_overlay()
         self.detail_table.selectRow(row_index + 1)
         self._set_dirty(True)
-        self.status_message.emit(f"Duplicated a row in {self.artifact_label.lower()}.")
+        self.status_message.emit(f"Đã nhân bản dòng trong {self.artifact_label.lower()}.")
 
     def _delete_entry(self) -> None:
         entries = self._entries()
         row_index = self.detail_table.currentRow()
         if entries is None or not (0 <= row_index < len(entries)):
-            self.status_message.emit("Select a row to delete.")
+            self.status_message.emit("Hãy chọn một dòng để xóa.")
             return
         entries.pop(row_index)
         self._rebuild_detail_table(entries)
@@ -1130,21 +1137,21 @@ class EditableSegmentJsonlTab(QWidget):
         if entries:
             self.detail_table.selectRow(min(row_index, len(entries) - 1))
         self._set_dirty(True)
-        self.status_message.emit(f"Deleted a row from {self.artifact_label.lower()}.")
+        self.status_message.emit(f"Đã xóa dòng khỏi {self.artifact_label.lower()}.")
 
     def _reload(self) -> None:
-        if not self.resolve_unsaved_changes(self, "reloading this tab"):
+        if not self.resolve_unsaved_changes(self, "tải lại Tab"):
             return
         self.reload_requested.emit()
 
     def _save_current(self, show_success: bool, emit_change: bool) -> bool:
         if self.current_volume is None or self.current_segment_id is None or self.current_result is None:
-            self.status_message.emit(f"{self.artifact_label} is not available for saving.")
+            self.status_message.emit(f"Không thể lưu vì {self.artifact_label} không khả dụng.")
             return False
         try:
             result = self.save_callback(self.current_volume, self.current_segment_id, copy.deepcopy(self.current_result))
         except Exception as exc:
-            QMessageBox.critical(self, f"{self.artifact_label} Save Failed", str(exc))
+            QMessageBox.critical(self, f"Lưu {self.artifact_label} Thất Bại", str(exc))
             self.status_message.emit(str(exc))
             return False
 
@@ -1171,9 +1178,9 @@ class EditableSegmentJsonlTab(QWidget):
     def _unsaved_choice(self, parent: QWidget, reason: str) -> QMessageBox.StandardButton:
         box = QMessageBox(parent)
         box.setIcon(QMessageBox.Icon.Warning)
-        box.setWindowTitle("Unsaved Changes")
-        box.setText(f"{self.artifact_label} has unsaved changes.")
-        box.setInformativeText(f"What would you like to do before {reason}?")
+        box.setWindowTitle("Thay Đổi Chưa Lưu")
+        box.setText(f"{self.artifact_label} có thay đổi chưa lưu.")
+        box.setInformativeText(f"Bạn muốn thực hiện thao tác nào trước khi {reason}?")
         box.setStandardButtons(
             QMessageBox.StandardButton.Save
             | QMessageBox.StandardButton.Discard
@@ -1201,9 +1208,9 @@ class EditableSegmentJsonlTab(QWidget):
             item.setText(", ".join(flags))
 
     def _apply_filter(self) -> None:
-        selected_filter = self.filter_combo.currentText().strip() or "All"
+        selected_filter = self.filter_combo.currentText().strip() or "Tất cả"
         for row_index, flags in enumerate(self._canon_flags_by_row):
-            visible = selected_filter == "All" or selected_filter in flags
+            visible = selected_filter == "Tất cả" or selected_filter in flags
             self.detail_table.setRowHidden(row_index, not visible)
         current_row = self.detail_table.currentRow()
         if 0 <= current_row < len(self._canon_flags_by_row) and not self.detail_table.isRowHidden(current_row):
@@ -1218,11 +1225,11 @@ class EditableSegmentJsonlTab(QWidget):
         entries = self._entries()
         row_index = self.detail_table.currentRow()
         if self.current_volume is None or entries is None or not (0 <= row_index < len(entries)):
-            self.status_message.emit("Select a canon row before opening it in Series Canon.")
+            self.status_message.emit("Hãy chọn một dòng trước khi mở trong Canon Series.")
             return
         entry = entries[row_index]
         if not isinstance(entry, dict):
-            self.status_message.emit("Select a canon row before opening it in Series Canon.")
+            self.status_message.emit("Hãy chọn một dòng trước khi mở trong Canon Series.")
             return
         self.open_series_canon_requested.emit(self.canon_kind, copy.deepcopy(entry), self.current_volume)
 
@@ -1238,25 +1245,25 @@ class EditableDialogueLabelsTab(QWidget):
         super().__init__(parent)
         self.editor_actions = editor_actions
         self.summary_columns = [
-            ("item_id", "Item ID"),
-            ("status", "Status"),
-            ("segment", "Segment"),
-            ("units_count", "Units"),
-            ("review_count", "Review"),
-            ("low_confidence_count", "Low Confidence"),
-            ("labeled_source_preview", "Preview"),
+            ("item_id", "Mã Phân Đoạn"),
+            ("status", "Trạng Thái"),
+            ("segment", "Phân Đoạn"),
+            ("units_count", "Số Dòng Lời Thoại"),
+            ("review_count", "Cần Rà Soát"),
+            ("low_confidence_count", "Độ Tin Cậy Thấp"),
+            ("labeled_source_preview", "Xem Trước"),
         ]
         self.unit_columns = [
-            ColumnSpec("unit_id", "Unit ID"),
-            ColumnSpec("index", "Index"),
-            ColumnSpec("line_index", "Line Index"),
-            ColumnSpec("speaker", "Speaker", True),
-            ColumnSpec("listener", "Listener", True),
-            ColumnSpec("source_text", "Source Text", True),
-            ColumnSpec("confidence", "Confidence", True),
-            ColumnSpec("review_required", "Review", True, "bool"),
-            ColumnSpec("reason", "Reason", True),
-            ColumnSpec("notes", "Notes", True),
+            ColumnSpec("unit_id", "Mã Dòng"),
+            ColumnSpec("index", "Chỉ Mục"),
+            ColumnSpec("line_index", "Chỉ Mục Dòng Gốc"),
+            ColumnSpec("speaker", "Người Nói", True),
+            ColumnSpec("listener", "Người Nghe", True),
+            ColumnSpec("source_text", "Lời Thoại Gốc", True),
+            ColumnSpec("confidence", "Độ Tin Cậy", True),
+            ColumnSpec("review_required", "Cần Rà Soát", True, "bool"),
+            ColumnSpec("reason", "Lý Do", True),
+            ColumnSpec("notes", "Ghi Chú", True),
         ]
         self.current_context: SelectionContext | None = None
         self.current_volume: int | None = None
@@ -1292,7 +1299,7 @@ class EditableDialogueLabelsTab(QWidget):
             self._select_summary_row(preferred_segment_id)
             self._load_segment(preferred_segment_id, quiet=True)
         else:
-            self._clear_detail("Select a dialogue label row to edit, or choose a segment to create one.")
+            self._clear_detail("Hãy chọn một phân đoạn hội thoại để chỉnh sửa hoặc tạo mới.")
 
     def has_unsaved_changes(self) -> bool:
         return self._dirty
@@ -1316,7 +1323,7 @@ class EditableDialogueLabelsTab(QWidget):
         self.message_label.setWordWrap(True)
         layout.addWidget(self.message_label)
 
-        layout.addWidget(QLabel("Summary"))
+        layout.addWidget(QLabel("Bảng Tổng Quan"))
         self.summary_table = QTableWidget(0, len(self.summary_columns))
         self.summary_table.setHorizontalHeaderLabels([label for _key, label in self.summary_columns])
         self.summary_table.setAlternatingRowColors(False)
@@ -1333,23 +1340,25 @@ class EditableDialogueLabelsTab(QWidget):
         layout.addWidget(self.summary_table, 1)
 
         header_row = QHBoxLayout()
-        header_row.addWidget(QLabel("Editing Segment"))
-        self.segment_label = QLabel("No segment selected")
+        header_row.addWidget(QLabel("Đang Sửa Phân Đoạn:"))
+        self.segment_label = QLabel("Chưa chọn phân đoạn")
         self.segment_label.setObjectName("mutedLabel")
         header_row.addWidget(self.segment_label)
         header_row.addStretch(1)
         layout.addLayout(header_row)
 
-        self.detail_status_label = QLabel("Select a segment summary row to edit dialogue labels.")
+        self.detail_status_label = QLabel("Hãy chọn một phân đoạn trong Bảng Tổng Quan để chỉnh sửa nhãn hội thoại.")
         self.detail_status_label.setObjectName("mutedLabel")
         self.detail_status_label.setWordWrap(True)
         layout.addWidget(self.detail_status_label)
 
         action_row = QHBoxLayout()
-        self.save_button = QPushButton("Save Dialogue Labels")
-        self.reload_button = QPushButton("Reload/Revert")
-        self.copy_button = QPushButton("Copy Labeled Source")
-        self.reset_button = QPushButton("Reset From Original Source")
+        self.save_button = QPushButton("Lưu Nhãn Hội Thoại")
+        self.save_button.setObjectName("aiButton")
+        self.reload_button = QPushButton("Nạp Lại/Hoàn Tác")
+        self.copy_button = QPushButton("Sao Chép Mã Nhãn")
+        self.reset_button = QPushButton("Khôi Phục Nguồn Gốc")
+        self.reset_button.setObjectName("dangerButton")
         self.save_button.clicked.connect(lambda: self._save_current(show_success=True, emit_change=True))
         self.reload_button.clicked.connect(self._reload)
         self.copy_button.clicked.connect(self._copy_labeled_source)
@@ -1361,29 +1370,30 @@ class EditableDialogueLabelsTab(QWidget):
 
         editors_row = QHBoxLayout()
         labeled_panel = QVBoxLayout()
-        labeled_panel.addWidget(QLabel("Labeled Source"))
+        labeled_panel.addWidget(QLabel("Mã Nhãn Hội Thoại (labeled_source)"))
         self.labeled_source_edit = QTextEdit()
         self.labeled_source_edit.textChanged.connect(self._on_labeled_source_changed)
         labeled_panel.addWidget(self.labeled_source_edit, 1)
         editors_row.addLayout(labeled_panel, 1)
 
         source_panel = QVBoxLayout()
-        source_panel.addWidget(QLabel("Original Source"))
+        source_panel.addWidget(QLabel("Văn Bản Gốc"))
         self.source_preview = QTextEdit()
         self.source_preview.setReadOnly(True)
         source_panel.addWidget(self.source_preview, 1)
         editors_row.addLayout(source_panel, 1)
         layout.addLayout(editors_row, 2)
 
-        self.warnings_label = QLabel("No dialogue label warnings.")
+        self.warnings_label = QLabel("Không phát hiện cảnh báo nào.")
         self.warnings_label.setObjectName("mutedLabel")
         self.warnings_label.setWordWrap(True)
         layout.addWidget(self.warnings_label)
 
         unit_button_row = QHBoxLayout()
-        self.add_unit_button = QPushButton("Add Unit")
-        self.duplicate_unit_button = QPushButton("Duplicate Unit")
-        self.delete_unit_button = QPushButton("Delete Unit")
+        self.add_unit_button = QPushButton("Thêm Dòng Thoại")
+        self.duplicate_unit_button = QPushButton("Nhân Bản Dòng")
+        self.delete_unit_button = QPushButton("Xóa Dòng Thoại")
+        self.delete_unit_button.setObjectName("dangerButton")
         self.add_unit_button.clicked.connect(self._add_unit)
         self.duplicate_unit_button.clicked.connect(self._duplicate_unit)
         self.delete_unit_button.clicked.connect(self._delete_unit)
@@ -1461,14 +1471,14 @@ class EditableDialogueLabelsTab(QWidget):
         if not segment_id or segment_id == self.current_segment_id:
             return
         previous_segment_id = self.current_segment_id
-        if self._dirty and not self.resolve_unsaved_changes(self, f"loading segment {segment_id}"):
+        if self._dirty and not self.resolve_unsaved_changes(self, f"nạp phân đoạn {segment_id}"):
             self._select_summary_row(previous_segment_id)
             return
         self._load_segment(segment_id, quiet=False)
 
     def _load_segment(self, segment_id: str, quiet: bool) -> None:
         if self.current_volume is None:
-            self._clear_detail("A volume must be selected before dialogue label editing is available.")
+            self._clear_detail("Bạn cần chọn một Tập trước khi chỉnh sửa nhãn hội thoại phân đoạn.")
             return
         try:
             loaded = self.editor_actions.load_dialogue_labels(self.current_volume, segment_id)
@@ -1477,7 +1487,7 @@ class EditableDialogueLabelsTab(QWidget):
             self._clear_detail(str(exc))
             self.status_message.emit(str(exc))
             if not quiet:
-                QMessageBox.critical(self, "Dialogue Labels Load Failed", str(exc))
+                QMessageBox.critical(self, "Nạp Nhãn Hội Thoại Thất Bại", str(exc))
             return
 
         self.current_segment_id = loaded.item_id
@@ -1488,9 +1498,9 @@ class EditableDialogueLabelsTab(QWidget):
         self.segment_label.setText(loaded.item_id)
         self.detail_status_label.setText(
             loaded.message or (
-                "Editing the saved dialogue label row for this segment."
+                "Đang chỉnh sửa dòng nhãn hội thoại đã lưu cho phân đoạn này."
                 if loaded.exists
-                else "Editing an in-memory dialogue label draft until save."
+                else "Đang chỉnh sửa bản nhãn hội thoại tạm thời trong bộ nhớ cho đến khi Lưu."
             )
         )
 
@@ -1512,7 +1522,7 @@ class EditableDialogueLabelsTab(QWidget):
         self.current_result = None
         self.current_units_key = None
         self.current_source_text = ""
-        self.segment_label.setText("No segment selected")
+        self.segment_label.setText("Chưa chọn phân đoạn")
         self.detail_status_label.setText(message)
         self._loading_source = True
         self.labeled_source_edit.setPlainText("")
@@ -1521,7 +1531,7 @@ class EditableDialogueLabelsTab(QWidget):
         self._rebuild_units_table([])
         self._set_controls_enabled(False)
         self._set_dirty(False)
-        self.warnings_label.setText("No dialogue label warnings.")
+        self.warnings_label.setText("Không phát hiện cảnh báo nào.")
         self.object_selected.emit(None)
 
     def _units(self) -> list[dict[str, Any]] | None:
@@ -1628,7 +1638,7 @@ class EditableDialogueLabelsTab(QWidget):
         if units is not None and 0 <= row_index < len(units) and isinstance(units[row_index], dict):
             return (
                 RawEditTarget(
-                    title="Dialogue Unit",
+                    title="Dòng Thoại",
                     obj=copy.deepcopy(units[row_index]),
                     selection_key=f"dialogue-unit:{self.current_segment_id}:{row_index}",
                     apply_callback=lambda obj, target_segment_id=self.current_segment_id, target_index=row_index: self._apply_raw_unit_at_index(
@@ -1636,25 +1646,25 @@ class EditableDialogueLabelsTab(QWidget):
                         target_index,
                         obj,
                     ),
-                    message="Applied changes stay in memory until you save Dialogue Labels.",
+                    message="Thay đổi được áp dụng vào bộ nhớ tạm cho đến khi bấm Lưu Nhãn Hội Thoại.",
                 ),
                 "",
             )
         if isinstance(self.current_result, dict):
             return (
                 RawEditTarget(
-                    title="Dialogue Labels Result",
+                    title="Dữ Liệu Nhãn Hội Thoại",
                     obj=copy.deepcopy(self.current_result),
                     selection_key=f"dialogue-result:{self.current_segment_id}",
                     apply_callback=lambda obj, target_segment_id=self.current_segment_id: self._apply_raw_result_object(
                         target_segment_id,
                         obj,
                     ),
-                    message="Applied changes stay in memory until you save Dialogue Labels.",
+                    message="Thay đổi được áp dụng vào bộ nhớ tạm cho đến khi bấm Lưu Nhãn Hội Thoại.",
                 ),
                 "",
             )
-        return None, "Select a dialogue label row or unit to edit it as raw JSON."
+        return None, "Hãy chọn một dòng lời thoại hoặc kết quả phân đoạn để chỉnh sửa dưới dạng JSON thô."
 
     def apply_raw_edit_object(self, obj: dict[str, Any]) -> str:
         units = self._units()
@@ -1663,7 +1673,7 @@ class EditableDialogueLabelsTab(QWidget):
             return self._apply_raw_unit_at_index(self.current_segment_id, row_index, obj)
 
         if self.current_result is None:
-            raise ValueError("Select a dialogue label result before applying raw JSON.")
+            raise ValueError("Hãy chọn một phân đoạn hội thoại trước khi áp dụng JSON thô.")
         return self._apply_raw_result_object(self.current_segment_id, obj)
 
     def _apply_raw_unit_at_index(
@@ -1673,19 +1683,19 @@ class EditableDialogueLabelsTab(QWidget):
         obj: dict[str, Any] | list[Any],
     ) -> str:
         if not isinstance(obj, dict):
-            raise ValueError("Expected a JSON object for this selection.")
+            raise ValueError("Yêu cầu một đối tượng JSON cho mục này.")
         if expected_segment_id is not None and self.current_segment_id != expected_segment_id:
-            raise ValueError("The selected segment changed before this raw edit could be applied. Re-select the original unit or reset the panel.")
+            raise ValueError("Phân đoạn đã bị thay đổi trước khi áp dụng JSON. Vui lòng chọn lại dòng thoại ban đầu.")
         units = self._units()
         if units is None or not (0 <= row_index < len(units)):
-            raise ValueError("Select a dialogue unit before applying raw JSON.")
+            raise ValueError("Hãy chọn một dòng thoại trước khi áp dụng JSON thô.")
         units[row_index] = copy.deepcopy(obj)
         self._rebuild_units_table(units)
         self.units_table.selectRow(row_index)
         self._set_dirty(True)
         self._refresh_warnings()
         self.object_selected.emit(units[row_index])
-        return "Applied in memory. Click Save Dialogue Labels to write the artifact."
+        return "Đã áp dụng vào bộ nhớ tạm. Hãy bấm Lưu Nhãn Hội Thoại để ghi tệp dữ liệu."
 
     def _apply_raw_result_object(
         self,
@@ -1693,11 +1703,11 @@ class EditableDialogueLabelsTab(QWidget):
         obj: dict[str, Any] | list[Any],
     ) -> str:
         if not isinstance(obj, dict):
-            raise ValueError("Expected a JSON object for this selection.")
+            raise ValueError("Yêu cầu một đối tượng JSON cho mục này.")
         if expected_segment_id is not None and self.current_segment_id != expected_segment_id:
-            raise ValueError("The selected segment changed before this raw edit could be applied. Re-select the original result or reset the panel.")
+            raise ValueError("Phân đoạn đã bị thay đổi trước khi áp dụng JSON. Vui lòng chọn lại kết quả ban đầu.")
         if self.current_result is None:
-            raise ValueError("Select a dialogue label result before applying raw JSON.")
+            raise ValueError("Hãy chọn một phân đoạn hội thoại trước khi áp dụng JSON thô.")
         self.current_result = copy.deepcopy(obj)
         self.current_units_key, units = self.editor_actions.get_dialogue_units(self.current_result)
         self._loading_source = True
@@ -1707,38 +1717,38 @@ class EditableDialogueLabelsTab(QWidget):
         self._set_dirty(True)
         self._refresh_warnings()
         self.object_selected.emit(self.current_result)
-        return "Applied in memory. Click Save Dialogue Labels to write the artifact."
+        return "Đã áp dụng vào bộ nhớ tạm. Hãy bấm Lưu Nhãn Hội Thoại để ghi tệp dữ liệu."
 
     def _add_unit(self) -> None:
         units = self._units()
         if units is None:
-            self.status_message.emit("Select a segment before adding units.")
+            self.status_message.emit("Hãy chọn phân đoạn trước khi thêm dòng thoại mới.")
             return
         units.append(self.editor_actions.default_dialogue_unit())
         self._rebuild_units_table(units)
         self.units_table.selectRow(len(units) - 1)
         self._set_dirty(True)
         self._refresh_warnings()
-        self.status_message.emit("Added a new dialogue unit.")
+        self.status_message.emit("Đã thêm dòng thoại mới.")
 
     def _duplicate_unit(self) -> None:
         units = self._units()
         row_index = self.units_table.currentRow()
         if units is None or not (0 <= row_index < len(units)):
-            self.status_message.emit("Select a unit to duplicate.")
+            self.status_message.emit("Hãy chọn một dòng thoại để nhân bản.")
             return
         units.insert(row_index + 1, copy.deepcopy(units[row_index]))
         self._rebuild_units_table(units)
         self.units_table.selectRow(row_index + 1)
         self._set_dirty(True)
         self._refresh_warnings()
-        self.status_message.emit("Duplicated a dialogue unit.")
+        self.status_message.emit("Đã nhân bản dòng thoại.")
 
     def _delete_unit(self) -> None:
         units = self._units()
         row_index = self.units_table.currentRow()
         if units is None or not (0 <= row_index < len(units)):
-            self.status_message.emit("Select a unit to delete.")
+            self.status_message.emit("Hãy chọn một dòng thoại để xóa.")
             return
         units.pop(row_index)
         self._rebuild_units_table(units)
@@ -1746,24 +1756,24 @@ class EditableDialogueLabelsTab(QWidget):
             self.units_table.selectRow(min(row_index, len(units) - 1))
         self._set_dirty(True)
         self._refresh_warnings()
-        self.status_message.emit("Deleted a dialogue unit.")
+        self.status_message.emit("Đã xóa dòng thoại.")
 
     def _copy_labeled_source(self) -> None:
         text = self.labeled_source_edit.toPlainText()
         if not text:
-            self.status_message.emit("No labeled source text is available to copy.")
+            self.status_message.emit("Không có mã nhãn nào để sao chép.")
             return
         QApplication.clipboard().setText(text)
-        self.status_message.emit("Labeled source copied to clipboard.")
+        self.status_message.emit("Đã sao chép mã nhãn vào bộ nhớ tạm.")
 
     def _reset_from_original_source(self) -> None:
         if self.current_result is None or self.current_segment_id is None:
-            self.status_message.emit("Select a segment before resetting labeled source.")
+            self.status_message.emit("Hãy chọn phân đoạn trước khi khôi phục nguồn gốc.")
             return
         confirm = QMessageBox.question(
             self,
-            "Reset From Original Source",
-            "Replace labeled_source with the original segment content? Units will be kept unchanged.",
+            "Khôi Phục Nguồn Gốc",
+            "Khôi phục trường labeled_source về nội dung phân đoạn gốc? Các dòng thoại chi tiết bên dưới vẫn sẽ được giữ nguyên.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel,
         )
@@ -1775,16 +1785,16 @@ class EditableDialogueLabelsTab(QWidget):
         self.current_result["labeled_source"] = self.current_source_text
         self._set_dirty(True)
         self._refresh_warnings()
-        self.status_message.emit("Reset labeled source from the original segment content.")
+        self.status_message.emit("Đã khôi phục trường labeled_source về nội dung phân đoạn gốc.")
 
     def _reload(self) -> None:
-        if not self.resolve_unsaved_changes(self, "reloading this tab"):
+        if not self.resolve_unsaved_changes(self, "tải lại Tab"):
             return
         self.reload_requested.emit()
 
     def _save_current(self, show_success: bool, emit_change: bool) -> bool:
         if self.current_volume is None or self.current_segment_id is None or self.current_result is None:
-            self.status_message.emit("Dialogue labels are not available for saving.")
+            self.status_message.emit("Dữ liệu nhãn hội thoại không khả dụng để lưu.")
             return False
         self.current_result["labeled_source"] = self.labeled_source_edit.toPlainText()
         try:
@@ -1794,7 +1804,7 @@ class EditableDialogueLabelsTab(QWidget):
                 copy.deepcopy(self.current_result),
             )
         except Exception as exc:
-            QMessageBox.critical(self, "Dialogue Labels Save Failed", str(exc))
+            QMessageBox.critical(self, "Lưu Nhãn Hội Thoại Thất Bại", str(exc))
             self.status_message.emit(str(exc))
             return False
 
@@ -1833,11 +1843,11 @@ class EditableDialogueLabelsTab(QWidget):
             value = self.current_result.get("labeled_source")
             labeled_source = value if isinstance(value, str) else ""
         if not labeled_source:
-            warnings.append("labeled_source is empty.")
+            warnings.append("Mã nhãn hội thoại (labeled_source) đang trống.")
         if "[NARRATION]" in labeled_source:
-            warnings.append("labeled_source contains [NARRATION], which should not be introduced.")
+            warnings.append("Mã nhãn chứa thẻ [NARRATION], đây là thẻ không hợp lệ trong quy chuẩn.")
         if "[" not in labeled_source:
-            warnings.append("labeled_source does not contain any bracketed label markers.")
+            warnings.append("Mã nhãn không chứa bất kỳ thẻ nhãn đóng mở ngoặc [] nào.")
         units = self._units() or []
         bad_confidence_indexes = []
         for index, unit in enumerate(units):
@@ -1848,20 +1858,20 @@ class EditableDialogueLabelsTab(QWidget):
                 bad_confidence_indexes.append(index + 1)
         if bad_confidence_indexes:
             warnings.append(
-                "Units contain non-numeric confidence values at rows: "
+                "Các dòng thoại chứa giá trị Độ Tin Cậy không hợp lệ ở các dòng: "
                 + ", ".join(str(index) for index in bad_confidence_indexes)
                 + "."
             )
         self.warnings_label.setText(
-            "\n".join(warnings) if warnings else "No dialogue label warnings."
+            "\n".join(warnings) if warnings else "Không phát hiện cảnh báo nào."
         )
 
     def _unsaved_choice(self, parent: QWidget, reason: str) -> QMessageBox.StandardButton:
         box = QMessageBox(parent)
         box.setIcon(QMessageBox.Icon.Warning)
-        box.setWindowTitle("Unsaved Changes")
-        box.setText("Dialogue Labels has unsaved changes.")
-        box.setInformativeText(f"What would you like to do before {reason}?")
+        box.setWindowTitle("Thay Đổi Chưa Lưu")
+        box.setText("Nhãn hội thoại có thay đổi chưa lưu.")
+        box.setInformativeText(f"Bạn muốn làm gì trước khi {reason}?")
         box.setStandardButtons(
             QMessageBox.StandardButton.Save
             | QMessageBox.StandardButton.Discard
@@ -1882,11 +1892,11 @@ class EditableTranslationsTab(QWidget):
         super().__init__(parent)
         self.editor_actions = editor_actions
         self.summary_columns = [
-            ("item_id", "Item ID"),
-            ("draft_exists", "Draft"),
-            ("fixed_exists", "Fixed"),
-            ("qa_exists", "QA"),
-            ("translation_preview", "Preview"),
+            ("item_id", "Mã Phân Đoạn"),
+            ("draft_exists", "Bản Nháp"),
+            ("fixed_exists", "Bản Sửa"),
+            ("qa_exists", "Đánh Giá QA"),
+            ("translation_preview", "Xem Trước Bản Dịch"),
         ]
         self.current_context: SelectionContext | None = None
         self.current_volume: int | None = None
@@ -1924,7 +1934,7 @@ class EditableTranslationsTab(QWidget):
             self._select_summary_row(preferred_segment_id)
             self._load_segment(preferred_segment_id, quiet=True)
         else:
-            self._clear_detail("Select a translation summary row to edit a segment translation.")
+            self._clear_detail("Hãy chọn một phân đoạn trong Bảng Tổng Quan để tiến hành dịch thuật.")
 
     def has_unsaved_changes(self) -> bool:
         return self._dirty
@@ -1948,7 +1958,7 @@ class EditableTranslationsTab(QWidget):
         self.message_label.setWordWrap(True)
         layout.addWidget(self.message_label)
 
-        layout.addWidget(QLabel("Summary"))
+        layout.addWidget(QLabel("Bảng Tổng Quan"))
         self.summary_table = QTableWidget(0, len(self.summary_columns))
         self.summary_table.setHorizontalHeaderLabels([label for _key, label in self.summary_columns])
         self.summary_table.setAlternatingRowColors(False)
@@ -1965,29 +1975,31 @@ class EditableTranslationsTab(QWidget):
         layout.addWidget(self.summary_table, 1)
 
         header_row = QHBoxLayout()
-        header_row.addWidget(QLabel("Editing Segment"))
-        self.segment_label = QLabel("No segment selected")
+        header_row.addWidget(QLabel("Đang Sửa Phân Đoạn:"))
+        self.segment_label = QLabel("Chưa chọn phân đoạn")
         self.segment_label.setObjectName("mutedLabel")
         header_row.addWidget(self.segment_label)
         header_row.addStretch(1)
-        header_row.addWidget(QLabel("Mode"))
+        header_row.addWidget(QLabel("Chế Độ:"))
         self.mode_combo = QComboBox()
-        self.mode_combo.addItem("Draft Translation", "draft")
-        self.mode_combo.addItem("Fixed Translation", "fixed")
+        self.mode_combo.addItem("Bản Dịch Nháp", "draft")
+        self.mode_combo.addItem("Bản Dịch Sửa Lỗi", "fixed")
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         header_row.addWidget(self.mode_combo)
         layout.addLayout(header_row)
 
-        self.detail_status_label = QLabel("Select a translation summary row to edit a segment translation.")
+        self.detail_status_label = QLabel("Hãy chọn một phân đoạn trong Bảng Tổng Quan để tiến hành dịch thuật.")
         self.detail_status_label.setObjectName("mutedLabel")
         self.detail_status_label.setWordWrap(True)
         layout.addWidget(self.detail_status_label)
 
         button_row = QHBoxLayout()
-        self.save_draft_button = QPushButton("Save Draft Translation")
-        self.save_fixed_button = QPushButton("Save Fixed Translation")
-        self.copy_button = QPushButton("Copy Translation")
-        self.reload_button = QPushButton("Reload/Revert")
+        self.save_draft_button = QPushButton("Lưu Bản Dịch Nháp")
+        self.save_draft_button.setObjectName("aiButton")
+        self.save_fixed_button = QPushButton("Lưu Bản Dịch Sửa Lỗi")
+        self.save_fixed_button.setObjectName("aiButton")
+        self.copy_button = QPushButton("Sao Chép Bản Dịch")
+        self.reload_button = QPushButton("Nạp Lại/Hoàn Tác")
         self.save_draft_button.clicked.connect(lambda: self._save_mode("draft", show_success=True, emit_change=True))
         self.save_fixed_button.clicked.connect(lambda: self._save_mode("fixed", show_success=True, emit_change=True))
         self.copy_button.clicked.connect(self._copy_translation)
@@ -2002,36 +2014,36 @@ class EditableTranslationsTab(QWidget):
 
         self.original_source_edit = QTextEdit()
         self.original_source_edit.setReadOnly(True)
-        self.reference_tabs.addTab(self.original_source_edit, "Original Source")
+        self.reference_tabs.addTab(self.original_source_edit, "Văn Bản Gốc")
 
         self.labeled_source_edit = QTextEdit()
         self.labeled_source_edit.setReadOnly(True)
-        self.reference_tabs.addTab(self.labeled_source_edit, "Labeled Source")
+        self.reference_tabs.addTab(self.labeled_source_edit, "Mã Nhãn Lời Thoại")
 
         self.glossary_table = QTableWidget(0, 2)
-        self.glossary_table.setHorizontalHeaderLabels(["Source", "Vietnamese"])
+        self.glossary_table.setHorizontalHeaderLabels(["Gốc", "Tiếng Việt"])
         self._configure_reference_table(self.glossary_table)
-        self.reference_tabs.addTab(self.glossary_table, "Segment Glossary")
+        self.reference_tabs.addTab(self.glossary_table, "Thuật Ngữ Phân Đoạn")
 
         self.pronouns_table = QTableWidget(0, 4)
-        self.pronouns_table.setHorizontalHeaderLabels(["Speaker", "Listener", "Self", "Other"])
+        self.pronouns_table.setHorizontalHeaderLabels(["Người Nói", "Người Nghe", "Xưng Mình", "Gọi Đối Phương"])
         self._configure_reference_table(self.pronouns_table)
-        self.reference_tabs.addTab(self.pronouns_table, "Segment Pronouns")
+        self.reference_tabs.addTab(self.pronouns_table, "Đại Tư Nhân Xưng")
 
         self.context_preview = QTextEdit()
         self.context_preview.setReadOnly(True)
-        self.reference_tabs.addTab(self.context_preview, "Segment Context")
+        self.reference_tabs.addTab(self.context_preview, "Ngữ Cảnh Phân Đoạn")
 
         self.qa_preview = QTextEdit()
         self.qa_preview.setReadOnly(True)
-        self.reference_tabs.addTab(self.qa_preview, "QA Report")
+        self.reference_tabs.addTab(self.qa_preview, "Báo Cáo QA")
 
         content_row.addWidget(self.reference_tabs, 1)
 
         editor_panel = QWidget()
         editor_layout = QVBoxLayout(editor_panel)
-        editor_layout.addWidget(QLabel("Translation"))
-        self.translation_status_label = QLabel("Translation editing is available when a segment is selected.")
+        editor_layout.addWidget(QLabel("Khung Nhập Bản Dịch"))
+        self.translation_status_label = QLabel("Hãy chọn phân đoạn hội thoại để bắt đầu nhập bản dịch.")
         self.translation_status_label.setObjectName("mutedLabel")
         self.translation_status_label.setWordWrap(True)
         editor_layout.addWidget(self.translation_status_label)
@@ -2113,7 +2125,7 @@ class EditableTranslationsTab(QWidget):
 
     def _load_segment(self, segment_id: str, quiet: bool) -> None:
         if self.current_volume is None:
-            self._clear_detail("A volume must be selected before translation editing is available.")
+            self._clear_detail("Bạn cần chọn một Tập trước khi chỉnh sửa bản dịch.")
             return
         try:
             bundle = self.editor_actions.load_translation_bundle(self.current_volume, segment_id)
@@ -2121,7 +2133,7 @@ class EditableTranslationsTab(QWidget):
             self._clear_detail(str(exc))
             self.status_message.emit(str(exc))
             if not quiet:
-                QMessageBox.critical(self, "Translations Load Failed", str(exc))
+                QMessageBox.critical(self, "Nạp Bản Dịch Thất Bại", str(exc))
             return
 
         self.current_segment_id = bundle.segment_id
@@ -2131,7 +2143,7 @@ class EditableTranslationsTab(QWidget):
         self.current_draft_result = copy.deepcopy(self.loaded_draft_result)
         self.current_fixed_result = copy.deepcopy(self.loaded_fixed_result)
         self.segment_label.setText(bundle.segment_id)
-        self.detail_status_label.setText("Editing saved and in-memory translation artifacts for this segment.")
+        self.detail_status_label.setText("Đang chỉnh sửa bản dịch tạm thời trong bộ nhớ cho phân đoạn này.")
         self._populate_reference_panels(bundle)
         self._refresh_translation_editor()
         self._set_detail_controls_enabled(True)
@@ -2140,12 +2152,12 @@ class EditableTranslationsTab(QWidget):
 
     def _populate_reference_panels(self, bundle: TranslationBundle) -> None:
         source_record = bundle.source_record or {}
-        self.original_source_edit.setPlainText(str(source_record.get("content") or "No source record found for this segment."))
+        self.original_source_edit.setPlainText(str(source_record.get("content") or "Không tìm thấy văn bản gốc cho phân đoạn này."))
 
         dialogue_labels = bundle.dialogue_labels or {}
         labeled_source = dialogue_labels.get("labeled_source")
         self.labeled_source_edit.setPlainText(
-            labeled_source if isinstance(labeled_source, str) and labeled_source else "No dialogue labels found for this segment."
+            labeled_source if isinstance(labeled_source, str) and labeled_source else "Không tìm thấy nhãn hội thoại cho phân đoạn này."
         )
 
         glossary_rows: list[dict[str, Any]] = []
@@ -2156,7 +2168,7 @@ class EditableTranslationsTab(QWidget):
             self.glossary_table,
             glossary_rows,
             ("source", "vi"),
-            empty_message="No segment glossary entries found.",
+            empty_message="Không tìm thấy từ vựng thuật ngữ nào cho phân đoạn này.",
         )
 
         pronoun_rows: list[dict[str, Any]] = []
@@ -2167,18 +2179,18 @@ class EditableTranslationsTab(QWidget):
             self.pronouns_table,
             pronoun_rows,
             ("speaker", "listener", "self", "other"),
-            empty_message="No segment pronoun rules found.",
+            empty_message="Không tìm thấy quy tắc đại từ nhân xưng nào cho phân đoạn này.",
         )
 
         self.context_preview.setPlainText(
             pretty(bundle.segment_context)
             if isinstance(bundle.segment_context, dict)
-            else "No segment context found."
+            else "Không có thông tin ngữ cảnh cho phân đoạn này."
         )
         self.qa_preview.setPlainText(
             pretty(bundle.qa_result)
             if isinstance(bundle.qa_result, dict)
-            else "No QA report found."
+            else "Không có báo cáo QA nào cho phân đoạn này."
         )
 
     def _populate_reference_table(
@@ -2209,10 +2221,10 @@ class EditableTranslationsTab(QWidget):
             self._loading_translation = False
         row_state = []
         if self.current_bundle is not None:
-            row_state.append("draft row exists" if self.current_bundle.draft_row else "draft row missing")
-            row_state.append("fixed row exists" if self.current_bundle.fixed_row else "fixed row missing")
+            row_state.append("tồn tại bản nháp" if self.current_bundle.draft_row else "thiếu bản nháp")
+            row_state.append("tồn tại bản sửa" if self.current_bundle.fixed_row else "thiếu bản sửa")
         self.translation_status_label.setText(
-            f"Editing field '{translation_ref.field_name}' in {self.mode_combo.currentText().lower()}. "
+            f"Đang soạn thảo trường '{translation_ref.field_name}' trong {self.mode_combo.currentText().lower()}. "
             + (", ".join(row_state) if row_state else "")
         )
         self._update_mode_button_states()
@@ -2244,7 +2256,7 @@ class EditableTranslationsTab(QWidget):
         self._set_dirty(True)
         translation_ref = self.editor_actions.get_translation_text(updated)
         self.translation_status_label.setText(
-            f"Editing field '{translation_ref.field_name}' in {self.mode_combo.currentText().lower()}."
+            f"Đang soạn thảo trường '{translation_ref.field_name}' trong {self.mode_combo.currentText().lower()}."
         )
         self.object_selected.emit(updated)
 
@@ -2257,7 +2269,7 @@ class EditableTranslationsTab(QWidget):
 
         saved_during_switch = False
         if self._dirty:
-            choice = self._unsaved_choice(self, f"switching to {self.mode_combo.currentText().lower()}")
+            choice = self._unsaved_choice(self, f"chuyển sang {self.mode_combo.currentText().lower()}")
             if choice == QMessageBox.StandardButton.Save:
                 if not self._save_mode(self._active_mode, show_success=False, emit_change=False):
                     self._set_mode_combo(self._active_mode)
@@ -2280,12 +2292,12 @@ class EditableTranslationsTab(QWidget):
 
     def _save_mode(self, mode: str, show_success: bool, emit_change: bool) -> bool:
         if self.current_volume is None or self.current_segment_id is None:
-            self.status_message.emit("Translations are not available for saving.")
+            self.status_message.emit("Không có bản dịch nào để lưu.")
             return False
 
         result_obj = self.current_draft_result if mode == "draft" else self.current_fixed_result
         if result_obj is None:
-            self.status_message.emit("No translation data is loaded for the selected segment.")
+            self.status_message.emit("Không có dữ liệu bản dịch nào được nạp cho phân đoạn đang chọn.")
             return False
 
         try:
@@ -2304,7 +2316,7 @@ class EditableTranslationsTab(QWidget):
                 )
                 self.loaded_fixed_result = copy.deepcopy(result_obj)
         except Exception as exc:
-            QMessageBox.critical(self, "Translation Save Failed", str(exc))
+            QMessageBox.critical(self, "Lưu Bản Dịch Thất Bại", str(exc))
             self.status_message.emit(str(exc))
             return False
 
@@ -2318,13 +2330,13 @@ class EditableTranslationsTab(QWidget):
     def _copy_translation(self) -> None:
         text = self.translation_edit.toPlainText()
         if not text:
-            self.status_message.emit("No translation text is available to copy.")
+            self.status_message.emit("Không có bản dịch nào để sao chép.")
             return
         QApplication.clipboard().setText(text)
-        self.status_message.emit("Copied translation text to the clipboard.")
+        self.status_message.emit("Đã sao chép nội dung dịch vào bộ nhớ tạm.")
 
     def _reload(self) -> None:
-        if not self.resolve_unsaved_changes(self, "reloading this tab"):
+        if not self.resolve_unsaved_changes(self, "tải lại Tab"):
             return
         self.reload_requested.emit()
 
@@ -2339,20 +2351,20 @@ class EditableTranslationsTab(QWidget):
         self.current_fixed_result = None
         self.loaded_draft_result = None
         self.loaded_fixed_result = None
-        self.segment_label.setText("No segment selected")
+        self.segment_label.setText("Chưa chọn phân đoạn")
         self.detail_status_label.setText(message)
         self.original_source_edit.setPlainText("")
         self.labeled_source_edit.setPlainText("")
         self.context_preview.setPlainText("")
         self.qa_preview.setPlainText("")
         self.translation_edit.setPlainText("")
-        self.translation_status_label.setText("Translation editing is available when a segment is selected.")
-        self._populate_reference_table(self.glossary_table, [], ("source", "vi"), "No segment glossary entries found.")
+        self.translation_status_label.setText("Hãy chọn phân đoạn hội thoại để bắt đầu nhập bản dịch.")
+        self._populate_reference_table(self.glossary_table, [], ("source", "vi"), "Không tìm thấy từ vựng thuật ngữ nào cho phân đoạn này.")
         self._populate_reference_table(
             self.pronouns_table,
             [],
             ("speaker", "listener", "self", "other"),
-            "No segment pronoun rules found.",
+            "Không tìm thấy quy tắc đại từ nhân xưng nào cho phân đoạn này.",
         )
         self._set_detail_controls_enabled(False)
         self._set_dirty(False)
@@ -2404,8 +2416,8 @@ class EditableTranslationsTab(QWidget):
     def raw_edit_descriptor(self) -> tuple[RawEditTarget | None, str]:
         current_result = self._current_result()
         if not isinstance(current_result, dict):
-            return None, "Select a translation row before editing its raw JSON."
-        title = "Draft Translation Result" if self._active_mode == "draft" else "Fixed Translation Result"
+            return None, "Hãy chọn một phân đoạn dịch trước khi sửa JSON thô."
+        title = "Kết Quả Dịch Nháp" if self._active_mode == "draft" else "Kết Quả Dịch Sửa Lỗi"
         return (
             RawEditTarget(
                 title=title,
@@ -2416,7 +2428,7 @@ class EditableTranslationsTab(QWidget):
                     mode,
                     obj,
                 ),
-                message="Applied changes stay in memory until you save the current translation mode.",
+                message="Thay đổi được áp dụng vào bộ nhớ tạm cho đến khi bấm Lưu Bản Dịch.",
             ),
             "",
         )
@@ -2431,9 +2443,9 @@ class EditableTranslationsTab(QWidget):
         obj: dict[str, Any] | list[Any],
     ) -> str:
         if not isinstance(obj, dict):
-            raise ValueError("Expected a JSON object for this selection.")
+            raise ValueError("Yêu cầu một đối tượng JSON cho mục này.")
         if expected_segment_id is not None and self.current_segment_id != expected_segment_id:
-            raise ValueError("The selected segment changed before this raw edit could be applied. Re-select the original translation result or reset the panel.")
+            raise ValueError("Phân đoạn đã bị thay đổi trước khi áp dụng JSON. Vui lòng chọn lại kết quả ban đầu.")
         if mode == "draft":
             self.current_draft_result = copy.deepcopy(obj)
         else:
@@ -2444,8 +2456,8 @@ class EditableTranslationsTab(QWidget):
             if current_result is not None:
                 self.object_selected.emit(current_result)
         self._set_dirty(True)
-        action = "Save Draft Translation" if mode == "draft" else "Save Fixed Translation"
-        return f"Applied in memory. Click {action} to write the artifact."
+        action = "Lưu Bản Dịch Nháp" if mode == "draft" else "Lưu Bản Dịch Sửa Lỗi"
+        return f"Đã áp dụng vào bộ nhớ tạm. Hãy bấm {action} để ghi tệp dữ liệu."
 
     def _set_dirty(self, dirty: bool) -> None:
         if self._dirty == dirty:
@@ -2456,15 +2468,14 @@ class EditableTranslationsTab(QWidget):
     def _unsaved_choice(self, parent: QWidget, reason: str) -> QMessageBox.StandardButton:
         box = QMessageBox(parent)
         box.setIcon(QMessageBox.Icon.Warning)
-        box.setWindowTitle("Unsaved Changes")
-        box.setText("Translations has unsaved changes.")
-        box.setInformativeText(f"What would you like to do before {reason}?")
+        box.setWindowTitle("Thay Đổi Chưa Lưu")
+        box.setText("Bản dịch có thay đổi chưa lưu.")
+        box.setInformativeText(f"Bạn muốn thực hiện thao tác nào trước khi {reason}?")
         box.setStandardButtons(
             QMessageBox.StandardButton.Save
             | QMessageBox.StandardButton.Discard
             | QMessageBox.StandardButton.Cancel
         )
-        box.setDefaultButton(QMessageBox.StandardButton.Save)
         return QMessageBox.StandardButton(box.exec())
 
 
@@ -2508,19 +2519,19 @@ class EditorArtifactTabs(QWidget):
     def current_raw_edit_target(self) -> tuple[RawEditTarget | None, str]:
         widget = self.tabs.currentWidget()
         if widget is None:
-            return None, "Raw edit is waiting for an editable selection."
+            return None, "Trình chỉnh sửa thô đang đợi một lựa chọn hợp lệ để chỉnh sửa."
         descriptor = getattr(widget, "raw_edit_descriptor", None)
         if callable(descriptor):
             return descriptor()
-        return None, "Raw edit is only available for supported editable tabs."
+        return None, "Trình chỉnh sửa thô chỉ khả dụng cho các Tab cho phép chỉnh sửa dữ liệu."
 
     def apply_raw_edit_object(self, obj: dict[str, Any]) -> str:
         widget = self.tabs.currentWidget()
         if widget is None:
-            raise ValueError("No Editor tab is active for raw editing.")
+            raise ValueError("Không có Tab soạn thảo nào đang hoạt động để sửa JSON thô.")
         apply_raw = getattr(widget, "apply_raw_edit_object", None)
         if not callable(apply_raw):
-            raise ValueError("Raw edit is not available for the current tab.")
+            raise ValueError("Chỉnh sửa JSON thô không khả dụng cho Tab hiện tại.")
         message = apply_raw(obj)
         self._emit_raw_edit_target()
         return message
@@ -2530,149 +2541,149 @@ class EditorArtifactTabs(QWidget):
         self.tabs = QTabWidget()
 
         self.volume_glossary_tab = EditableVolumeTableTab(
-            artifact_label="Volume Glossary",
+            artifact_label="Thuật Ngữ Tập",
             list_key="volume_merge_glossary",
             canon_kind="glossary",
             canon_lens=self.canon_lens,
             columns=[
-                ColumnSpec("id", "ID"),
-                ColumnSpec("source", "Source", True),
-                ColumnSpec("vi", "Vietnamese", True),
-                ColumnSpec("type", "Type", True),
-                ColumnSpec("status", "Status", True),
-                ColumnSpec("notes", "Notes", True),
-                ColumnSpec("needs_human_review", "Needs Review", True, "bool"),
-                ColumnSpec("variants", "Variants", False, "count"),
-                ColumnSpec("aliases", "Aliases", False, "count"),
-                ColumnSpec("forbidden_translations", "Forbidden", False, "count"),
-                ColumnSpec("appears_in", "Appears In", False, "count"),
-                ColumnSpec("canon_status", "Canon Status"),
+                ColumnSpec("id", "Mã"),
+                ColumnSpec("source", "Từ Gốc", True),
+                ColumnSpec("vi", "Tiếng Việt", True),
+                ColumnSpec("type", "Phân Loại", True),
+                ColumnSpec("status", "Trạng Thái", True),
+                ColumnSpec("notes", "Ghi Chú", True),
+                ColumnSpec("needs_human_review", "Cần Rà Soát", True, "bool"),
+                ColumnSpec("variants", "Biến Thể", False, "count"),
+                ColumnSpec("aliases", "Bí Danh", False, "count"),
+                ColumnSpec("forbidden_translations", "Từ Cấm", False, "count"),
+                ColumnSpec("appears_in", "Xuất Hiện", False, "count"),
+                ColumnSpec("canon_status", "Trạng Thái Canon"),
             ],
-            raw_edit_title="Glossary Entry",
+            raw_edit_title="Mục Thuật Ngữ",
             default_row_factory=self.editor_actions.default_volume_glossary_row,
             save_callback=self.editor_actions.save_volume_glossary_draft,
             approve_callback=self.editor_actions.approve_volume_glossary,
-            approve_button_text="Approve Glossary",
+            approve_button_text="Duyệt Thuật Ngữ",
         )
         self.volume_relationships_tab = EditableVolumeTableTab(
-            artifact_label="Volume Relationships",
+            artifact_label="Đại Từ Nhân Xưng Tập",
             list_key="relationship_pronoun_canon",
             canon_kind="relationships",
             canon_lens=self.canon_lens,
             columns=[
-                ColumnSpec("id", "ID"),
-                ColumnSpec("speaker", "Speaker", True),
-                ColumnSpec("listener", "Listener", True),
-                ColumnSpec("relationship", "Relationship", True),
-                ColumnSpec("self", "Self", True),
-                ColumnSpec("other", "Other", True),
-                ColumnSpec("scope", "Scope", True),
-                ColumnSpec("status", "Status", True),
-                ColumnSpec("notes", "Notes", True),
-                ColumnSpec("needs_human_review", "Needs Review", True, "bool"),
-                ColumnSpec("variants", "Variants", False, "count"),
-                ColumnSpec("canon_status", "Canon Status"),
+                ColumnSpec("id", "Mã"),
+                ColumnSpec("speaker", "Người Nói", True),
+                ColumnSpec("listener", "Người Nghe", True),
+                ColumnSpec("relationship", "Mối Quan Hệ", True),
+                ColumnSpec("self", "Xưng Mình", True),
+                ColumnSpec("other", "Gọi Đối Phương", True),
+                ColumnSpec("scope", "Phạm Vi", True),
+                ColumnSpec("status", "Trạng Thái", True),
+                ColumnSpec("notes", "Ghi Chú", True),
+                ColumnSpec("needs_human_review", "Cần Rà Soát", True, "bool"),
+                ColumnSpec("variants", "Biến Thể", False, "count"),
+                ColumnSpec("canon_status", "Trạng Thái Canon"),
             ],
-            raw_edit_title="Relationship Rule",
+            raw_edit_title="Quy Tắc Nhân Xưng",
             default_row_factory=self.editor_actions.default_volume_relationship_row,
             save_callback=self.editor_actions.save_volume_relationships_draft,
             approve_callback=self.editor_actions.approve_volume_relationships,
-            approve_button_text="Approve Relationships",
+            approve_button_text="Duyệt Đại Từ Nhân Xưng",
         )
         self.segment_glossaries_tab = EditableSegmentJsonlTab(
-            artifact_label="Segment Glossaries",
+            artifact_label="Thuật Ngữ Phân Đoạn",
             canon_kind="glossary",
             canon_lens=self.canon_lens,
             summary_columns=[
-                ("item_id", "Item ID"),
-                ("status", "Status"),
-                ("segment", "Segment"),
-                ("terms_count", "Terms"),
-                ("missing_count", "Missing"),
+                ("item_id", "Mã Phân Đoạn"),
+                ("status", "Trạng Thái"),
+                ("segment", "Phân Đoạn"),
+                ("terms_count", "Số Thuật Ngữ"),
+                ("missing_count", "Thiếu"),
             ],
             detail_columns=[
-                ColumnSpec("id", "ID"),
-                ColumnSpec("source", "Source", True),
-                ColumnSpec("vi", "Vietnamese", True),
-                ColumnSpec("type", "Type", True),
-                ColumnSpec("status", "Status", True),
-                ColumnSpec("notes", "Notes", True),
-                ColumnSpec("needs_human_review", "Needs Review", True, "bool"),
-                ColumnSpec("aliases", "Aliases", False, "count"),
-                ColumnSpec("variants", "Variants", False, "count"),
-                ColumnSpec("forbidden_translations", "Forbidden", False, "count"),
-                ColumnSpec("appears_in", "Appears In", False, "count"),
-                ColumnSpec("canon_status", "Canon Status"),
+                ColumnSpec("id", "Mã"),
+                ColumnSpec("source", "Từ Gốc", True),
+                ColumnSpec("vi", "Tiếng Việt", True),
+                ColumnSpec("type", "Phân Loại", True),
+                ColumnSpec("status", "Trạng Thái", True),
+                ColumnSpec("notes", "Ghi Chú", True),
+                ColumnSpec("needs_human_review", "Cần Rà Soát", True, "bool"),
+                ColumnSpec("aliases", "Bí Danh", False, "count"),
+                ColumnSpec("variants", "Biến Thể", False, "count"),
+                ColumnSpec("forbidden_translations", "Từ Cấm", False, "count"),
+                ColumnSpec("appears_in", "Xuất Hiện", False, "count"),
+                ColumnSpec("canon_status", "Trạng Thái Canon"),
             ],
-            raw_edit_title="Segment Glossary Entry",
+            raw_edit_title="Thuật Ngữ Phân Đoạn",
             load_callback=self.editor_actions.load_segment_glossary,
             save_callback=self.editor_actions.save_segment_glossary,
             list_getter=self.editor_actions.get_segment_glossary_entries,
             default_entry_factory=self.editor_actions.default_segment_glossary_entry,
-            add_button_text="Add Entry",
-            duplicate_button_text="Duplicate Entry",
-            delete_button_text="Delete Entry",
-            save_button_text="Save Segment Glossary",
+            add_button_text="Thêm Thuật Ngữ",
+            duplicate_button_text="Nhân Bản Thuật Ngữ",
+            delete_button_text="Xóa Thuật Ngữ",
+            save_button_text="Lưu Thuật Ngữ Phân Đoạn",
         )
         self.segment_pronouns_tab = EditableSegmentJsonlTab(
-            artifact_label="Segment Pronouns",
+            artifact_label="Đại Từ Phân Đoạn",
             canon_kind="relationships",
             canon_lens=self.canon_lens,
             summary_columns=[
-                ("item_id", "Item ID"),
-                ("status", "Status"),
-                ("segment", "Segment"),
-                ("rules_count", "Rules"),
-                ("overrides_count", "Overrides"),
-                ("missing_count", "Missing"),
+                ("item_id", "Mã Phân Đoạn"),
+                ("status", "Trạng Thái"),
+                ("segment", "Phân Đoạn"),
+                ("rules_count", "Số Quy Tắc"),
+                ("overrides_count", "Ghi Đè"),
+                ("missing_count", "Thiếu"),
             ],
             detail_columns=[
-                ColumnSpec("id", "ID"),
-                ColumnSpec("speaker", "Speaker", True),
-                ColumnSpec("listener", "Listener", True),
-                ColumnSpec("relationship", "Relationship", True),
-                ColumnSpec("self", "Self", True),
-                ColumnSpec("other", "Other", True),
-                ColumnSpec("scope", "Scope", True),
-                ColumnSpec("status", "Status", True),
-                ColumnSpec("notes", "Notes", True),
-                ColumnSpec("needs_human_review", "Needs Review", True, "bool"),
-                ColumnSpec("source", "Source"),
-                ColumnSpec("confidence", "Confidence"),
-                ColumnSpec("canon_status", "Canon Status"),
+                ColumnSpec("id", "Mã"),
+                ColumnSpec("speaker", "Người Nói", True),
+                ColumnSpec("listener", "Người Nghe", True),
+                ColumnSpec("relationship", "Mối Quan Hệ", True),
+                ColumnSpec("self", "Xưng Mình", True),
+                ColumnSpec("other", "Gọi Đối Phương", True),
+                ColumnSpec("scope", "Phạm Vi", True),
+                ColumnSpec("status", "Trạng Thái", True),
+                ColumnSpec("notes", "Ghi Chú", True),
+                ColumnSpec("needs_human_review", "Cần Rà Soát", True, "bool"),
+                ColumnSpec("source", "Nguồn Gốc"),
+                ColumnSpec("confidence", "Độ Tin Cậy"),
+                ColumnSpec("canon_status", "Trạng Thái Canon"),
             ],
-            raw_edit_title="Segment Pronoun Rule",
+            raw_edit_title="Nhân Xưng Phân Đoạn",
             load_callback=self.editor_actions.load_segment_pronouns,
             save_callback=self.editor_actions.save_segment_pronouns,
             list_getter=self.editor_actions.get_segment_pronoun_rules,
             default_entry_factory=self.editor_actions.default_segment_pronoun_rule,
-            add_button_text="Add Rule",
-            duplicate_button_text="Duplicate Rule",
-            delete_button_text="Delete Rule",
-            save_button_text="Save Segment Pronouns",
+            add_button_text="Thêm Quy Tắc",
+            duplicate_button_text="Nhân Bản Quy Tắc",
+            delete_button_text="Xóa Quy Tắc",
+            save_button_text="Lưu Đại Từ Nhân Xưng Phân Đoạn",
         )
         self.segment_contexts_tab = ArtifactTableTab(
             [
-                ("item_id", "Item ID"),
-                ("status", "Status"),
-                ("segment", "Segment"),
-                ("scene_type", "Scene Type"),
-                ("tone", "Tone"),
-                ("characters_count", "Characters"),
+                ("item_id", "Mã Phân Đoạn"),
+                ("status", "Trạng Thái"),
+                ("segment", "Phân Đoạn"),
+                ("scene_type", "Loại Bối Cảnh"),
+                ("tone", "Giọng Điệu"),
+                ("characters_count", "Số Nhân Vật"),
             ]
         )
         self.dialogue_labels_tab = EditableDialogueLabelsTab(self.editor_actions)
         self.translations_tab = EditableTranslationsTab(self.editor_actions)
         self.raw_json_viewer = RawJsonViewer()
 
-        self.tabs.addTab(self.volume_glossary_tab, "Volume Glossary")
-        self.tabs.addTab(self.volume_relationships_tab, "Volume Relationships")
-        self.tabs.addTab(self.segment_glossaries_tab, "Segment Glossaries")
-        self.tabs.addTab(self.segment_pronouns_tab, "Segment Pronouns")
-        self.tabs.addTab(self.segment_contexts_tab, "Segment Contexts")
-        self.tabs.addTab(self.dialogue_labels_tab, "Dialogue Labels")
-        self.tabs.addTab(self.translations_tab, "Translations")
-        self.tabs.addTab(self.raw_json_viewer, "Raw JSON")
+        self.tabs.addTab(self.volume_glossary_tab, "Thuật Ngữ Tập")
+        self.tabs.addTab(self.volume_relationships_tab, "Đại Từ Nhân Xưng Tập")
+        self.tabs.addTab(self.segment_glossaries_tab, "Thuật Ngữ Phân Đoạn")
+        self.tabs.addTab(self.segment_pronouns_tab, "Đại Từ Phân Đoạn")
+        self.tabs.addTab(self.segment_contexts_tab, "Ngữ Cảnh Phân Đoạn")
+        self.tabs.addTab(self.dialogue_labels_tab, "Nhãn Hội Thoại")
+        self.tabs.addTab(self.translations_tab, "Bản Dịch")
+        self.tabs.addTab(self.raw_json_viewer, "Dữ Liệu JSON Thô")
 
         for tab in (
             self.volume_glossary_tab,
@@ -2707,12 +2718,12 @@ class EditorArtifactTabs(QWidget):
 
     def _editable_tabs(self) -> list[tuple[str, Any]]:
         return [
-            ("Volume Glossary", self.volume_glossary_tab),
-            ("Volume Relationships", self.volume_relationships_tab),
-            ("Segment Glossaries", self.segment_glossaries_tab),
-            ("Segment Pronouns", self.segment_pronouns_tab),
-            ("Dialogue Labels", self.dialogue_labels_tab),
-            ("Translations", self.translations_tab),
+            ("Thuật Ngữ Tập", self.volume_glossary_tab),
+            ("Đại Từ Nhân Xưng Tập", self.volume_relationships_tab),
+            ("Thuật Ngữ Phân Đoạn", self.segment_glossaries_tab),
+            ("Đại Từ Phân Đoạn", self.segment_pronouns_tab),
+            ("Nhãn Hội Thoại", self.dialogue_labels_tab),
+            ("Bản Dịch", self.translations_tab),
         ]
 
     def _update_dirty_label(self, base_label: str, dirty: bool) -> None:

@@ -29,24 +29,26 @@ class ResponsePanel(QWidget):
 
     def clear_response(self) -> None:
         self.response_edit.clear()
-        self.status_label.setText("Response cleared.")
+        self.status_label.setText("Đã xóa nội dung phản hồi.")
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        title = QLabel("Response")
+        title = QLabel("Kết Quả AI Phản Hồi")
         title.setObjectName("titleLabel")
         layout.addWidget(title)
 
-        self.status_label = QLabel("Generate a prompt for a prompt-backed step to enable validation.")
+        self.status_label = QLabel("Hãy tạo Prompt trước để kích hoạt tính năng kiểm tra kết quả.")
         self.status_label.setObjectName("mutedLabel")
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
         actions = QHBoxLayout()
-        self.validate_button = QPushButton("Validate Response")
-        self.import_button = QPushButton("Import Response")
-        self.clear_button = QPushButton("Clear Response")
+        self.validate_button = QPushButton("Kiểm Tra Cú Pháp")
+        self.import_button = QPushButton("Nhập Bản Dịch")
+        self.import_button.setObjectName("aiButton")
+        self.clear_button = QPushButton("Xóa Trắng Khung")
+        self.clear_button.setObjectName("dangerButton")
         actions.addWidget(self.validate_button)
         actions.addWidget(self.import_button)
         actions.addWidget(self.clear_button)
@@ -54,7 +56,7 @@ class ResponsePanel(QWidget):
         layout.addLayout(actions)
 
         self.response_edit = QTextEdit()
-        self.response_edit.setPlaceholderText("Paste model JSON response here.")
+        self.response_edit.setPlaceholderText("Dán kết quả phản hồi JSON của AI tại đây.")
         layout.addWidget(self.response_edit, 1)
 
         self.set_validate_enabled(False)

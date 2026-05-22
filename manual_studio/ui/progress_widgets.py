@@ -7,7 +7,7 @@ from manual_studio.core.progress import StepProgress
 
 
 class ProgressTableWidget(QTableWidget):
-    HEADERS = ["Step", "Scope", "Done / Total", "Percent", "Status"]
+    HEADERS = ["Bước Dịch", "Phạm Vi", "Hoàn Thành", "Tỉ Lệ (%)", "Trạng Thái"]
 
     def __init__(self, parent=None):
         super().__init__(0, len(self.HEADERS), parent)
@@ -28,11 +28,42 @@ class ProgressTableWidget(QTableWidget):
     def set_progress(self, rows: list[StepProgress]) -> None:
         self.setRowCount(len(rows))
         for row_index, row in enumerate(rows):
-            self._set_item(row_index, 0, row.label)
-            self._set_item(row_index, 1, row.scope)
+            # Việt hóa nhãn bước dịch nếu cần
+            label = row.label
+            if label == "Build Segment Pronouns":
+                label = "Xây Dựng Đại Từ Phân Đoạn"
+            elif label == "Build Dialogue Labels":
+                label = "Xây Dựng Nhãn Hội Thoại"
+            elif label == "Translate Draft":
+                label = "Dịch Bản Thảo (Draft)"
+            elif label == "Apply Quick Fixes":
+                label = "Áp Dụng Sửa Lỗi Nhanh"
+            elif label == "Review and Refine":
+                label = "Rà Soát & Tinh Chỉnh"
+
+            # Việt hóa phạm vi
+            scope = row.scope
+            if scope == "volume":
+                scope = "Tập"
+            elif scope == "segment":
+                scope = "Phân Đoạn"
+
+            # Việt hóa trạng thái
+            status = row.status
+            if status == "Done":
+                status_display = "🟢 Đã chốt"
+            elif status == "Partial":
+                status_display = "🟡 Đang dịch"
+            elif status == "Not Started":
+                status_display = "⚪ Chưa bắt đầu"
+            else:
+                status_display = status
+
+            self._set_item(row_index, 0, label)
+            self._set_item(row_index, 1, scope)
             self._set_item(row_index, 2, f"{row.done} / {row.total}")
             self._set_item(row_index, 3, f"{row.percent:.2f}%")
-            self._set_item(row_index, 4, row.status)
+            self._set_item(row_index, 4, status_display)
         if rows:
             self.resizeRowsToContents()
 

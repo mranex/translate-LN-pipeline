@@ -68,30 +68,30 @@ class PromptStudioPage(QWidget):
         layout = QVBoxLayout(self)
 
         title_row = QHBoxLayout()
-        title = QLabel("Prompt Studio")
+        title = QLabel("Phòng Prompt AI")
         title.setObjectName("titleLabel")
         title_row.addWidget(title)
         title_row.addStretch(1)
-        context_label = QLabel("Selected context")
+        context_label = QLabel("Phân đoạn đang chọn:")
         context_label.setObjectName("mutedLabel")
         title_row.addWidget(context_label)
-        self.context_value = QLabel("none | No selection")
+        self.context_value = QLabel("không có | Chưa chọn")
         self.context_value.setObjectName("mutedLabel")
         title_row.addWidget(self.context_value)
         layout.addLayout(title_row)
 
         context_row = QHBoxLayout()
-        scope_label = QLabel("Scope")
+        scope_label = QLabel("Phạm vi:")
         scope_label.setObjectName("mutedLabel")
         context_row.addWidget(scope_label)
-        self.scope_value = QLabel("none")
+        self.scope_value = QLabel("không có")
         self.scope_value.setObjectName("mutedLabel")
         context_row.addWidget(self.scope_value)
         context_row.addSpacing(16)
-        selected_id_label = QLabel("Selected ID")
+        selected_id_label = QLabel("Mã đã chọn:")
         selected_id_label.setObjectName("mutedLabel")
         context_row.addWidget(selected_id_label)
-        self.selected_id_value = QLabel("No selection")
+        self.selected_id_value = QLabel("Chưa chọn")
         self.selected_id_value.setObjectName("mutedLabel")
         context_row.addWidget(self.selected_id_value)
         context_row.addStretch(1)
@@ -101,20 +101,29 @@ class PromptStudioPage(QWidget):
         selector_panel = QWidget()
         selector_layout = QVBoxLayout(selector_panel)
         selector_layout.setContentsMargins(0, 0, 0, 0)
-        selector_label = QLabel("Available step")
+        selector_label = QLabel("Bước thực hiện khả dụng:")
         selector_label.setObjectName("mutedLabel")
         selector_layout.addWidget(selector_label)
         self.step_selector = StepSelectorWidget()
         self.step_selector.step_changed.connect(self._on_step_changed)
         selector_layout.addWidget(self.step_selector)
+
+        # Khuyến nghị bước tiếp theo
+        self.recommendation_label = QLabel("")
+        self.recommendation_label.setStyleSheet("color: #06b6d4; font-weight: bold; background-color: #161e2e; border: 1px solid #06b6d4; border-radius: 4px; padding: 6px 10px; margin-top: 4px;")
+        self.recommendation_label.setWordWrap(True)
+        selector_layout.addWidget(self.recommendation_label)
+        self.recommendation_label.hide()
+
         header_row.addWidget(selector_panel, 1)
 
         action_column = QVBoxLayout()
         action_column.setContentsMargins(0, 0, 0, 0)
         action_row = QHBoxLayout()
-        self.generate_prompt_button = QPushButton("Generate Prompt")
-        self.copy_prompt_button = QPushButton("Copy Prompt")
-        self.run_local_action_button = QPushButton("Run Local Action")
+        self.generate_prompt_button = QPushButton("Tạo Prompt AI")
+        self.generate_prompt_button.setObjectName("aiButton")
+        self.copy_prompt_button = QPushButton("Sao Chép Prompt")
+        self.run_local_action_button = QPushButton("Chạy Tiến Trình")
         self.copy_prompt_button.setEnabled(False)
         self.run_local_action_button.setEnabled(False)
         self.generate_prompt_button.clicked.connect(self._generate_prompt)
@@ -132,12 +141,13 @@ class PromptStudioPage(QWidget):
         prompt_panel = QWidget()
         prompt_layout = QVBoxLayout(prompt_panel)
         prompt_layout.setContentsMargins(0, 0, 0, 0)
-        prompt_label = QLabel("Prompt Preview")
+        prompt_label = QLabel("Xem Trước Prompt")
         prompt_label.setObjectName("titleLabel")
         prompt_layout.addWidget(prompt_label)
         self.prompt_preview = QTextEdit()
         self.prompt_preview.setReadOnly(True)
-        self.prompt_preview.setPlaceholderText("Generated prompt text will appear here.")
+        self.prompt_preview.setStyleSheet("font-family: 'Consolas', monospace; background-color: #0c0d14; border: 1px solid #1f233a;")
+        self.prompt_preview.setPlaceholderText("Nội dung prompt được tạo sẽ xuất hiện tại đây.")
         prompt_layout.addWidget(self.prompt_preview, 1)
 
         self.response_panel = ResponsePanel()
@@ -151,7 +161,7 @@ class PromptStudioPage(QWidget):
         self.prompt_response_splitter.setStretchFactor(1, 2)
         layout.addWidget(self.prompt_response_splitter, 1)
 
-        self.workflow_status = QLabel("Select a project item and step to begin.")
+        self.workflow_status = QLabel("Hãy chọn phân đoạn của dự án và bước dịch để bắt đầu.")
         self.workflow_status.setObjectName("mutedLabel")
         self.workflow_status.setWordWrap(True)
         layout.addWidget(self.workflow_status)
@@ -160,19 +170,25 @@ class PromptStudioPage(QWidget):
         self._reset_generated_state(clear_response=False)
         if self.workflow_service is None or self.current_context is None:
             self.step_selector.set_steps([])
-            self.workflow_status.setText("Workflow service is not available.")
+            self.workflow_status.setText("Dịch vụ quy trình dịch thuật không khả dụng.")
+            self.recommendation_label.hide()
             return
         try:
             steps = self.workflow_service.available_steps(self.current_context.scope)
         except Exception as exc:
             self.step_selector.set_steps([])
-            self._show_error("Failed to load available steps.", exc)
+            self.recommendation_label.hide()
+            self._show_error("Không tải được danh sách các bước.", exc)
             return
         self.step_selector.set_steps(steps)
         if steps:
+            first_step = steps[0]
+            self.recommendation_label.setText(f"🔥 Khuyến nghị: Bắt đầu bước '{first_step.label}' để tiếp tục tiến trình.")
+            self.recommendation_label.show()
             self._update_step_mode()
         else:
-            self.workflow_status.setText("No steps are available for this scope.")
+            self.recommendation_label.hide()
+            self.workflow_status.setText("Không có bước dịch nào khả dụng cho phân đoạn này.")
 
     def _on_step_changed(self, _step_id: str) -> None:
         self._reset_generated_state(clear_response=False)
@@ -184,7 +200,7 @@ class PromptStudioPage(QWidget):
             self.generate_prompt_button.setEnabled(False)
             self.copy_prompt_button.setEnabled(False)
             self.run_local_action_button.setEnabled(False)
-            self.workflow_status.setText("No step selected.")
+            self.workflow_status.setText("Chưa chọn bước thực hiện.")
             return
 
         if step.is_local_action:
@@ -194,11 +210,11 @@ class PromptStudioPage(QWidget):
             self.response_panel.set_validate_enabled(False)
             self.response_panel.set_import_enabled(False)
             if step.writes_artifact:
-                self.response_panel.set_status("Local action selected. Use Run Local Action to update the artifact.")
-                self.workflow_status.setText("Local action selected. Run it to update the current artifact.")
+                self.response_panel.set_status("Đã chọn tiến trình nội bộ. Hãy chạy Tiến Trình để cập nhật dữ liệu.")
+                self.workflow_status.setText("Đã chọn tiến trình nội bộ. Hãy chạy Tiến Trình để cập nhật dữ liệu.")
             else:
-                self.response_panel.set_status("Local placeholder selected. Run Local Action to see the placeholder message.")
-                self.workflow_status.setText("Local placeholder selected. Editor-backed handling will arrive in a later phase.")
+                self.response_panel.set_status("Đã chọn tiến trình mẫu. Hãy chạy Tiến Trình để xem thông báo mẫu.")
+                self.workflow_status.setText("Đã chọn tiến trình mẫu. Hỗ trợ soạn thảo trực tiếp sẽ được cập nhật ở phiên bản sau.")
             return
 
         self.generate_prompt_button.setEnabled(True)
@@ -206,24 +222,24 @@ class PromptStudioPage(QWidget):
         self.copy_prompt_button.setEnabled(False)
         self.response_panel.set_validate_enabled(False)
         self.response_panel.set_import_enabled(False)
-        self.response_panel.set_status("Generate a prompt for this step, then paste and validate a response.")
-        self.workflow_status.setText("Prompt-backed step selected. Generate prompt to continue.")
+        self.response_panel.set_status("Hãy Tạo Prompt cho bước này, sau đó dán kết quả AI và thực hiện Kiểm Tra.")
+        self.workflow_status.setText("Đã chọn bước dùng AI Prompt. Hãy Tạo Prompt để tiếp tục.")
 
     def _generate_prompt(self) -> None:
         if self.workflow_service is None or self.current_context is None:
-            self._show_message("No workflow context is available.")
+            self._show_message("Bối cảnh quy trình dịch thuật không khả dụng.")
             return
         step = self.step_selector.selected_step()
         if step is None:
-            self._show_message("Please select a step first.")
+            self._show_message("Vui lòng chọn bước thực hiện trước.")
             return
         if step.is_local_action:
-            self._show_message("This is a local action. Use Run Local Action instead of Generate Prompt.")
+            self._show_message("Đây là tiến trình nội bộ. Vui lòng bấm Chạy Tiến Trình thay vì Tạo Prompt.")
             return
         try:
             result = self.workflow_service.render_prompt(step.id, self.current_context)
         except Exception as exc:
-            self._show_error("Failed to generate prompt.", exc)
+            self._show_error("Tạo prompt thất bại.", exc)
             return
 
         self.generated_step_id = result.step_id
@@ -235,37 +251,37 @@ class PromptStudioPage(QWidget):
         if result.is_local_action:
             self.response_panel.set_validate_enabled(False)
             self.response_panel.set_import_enabled(False)
-            self.response_panel.set_status("Local/manual step. Response import is disabled.")
-            self.workflow_status.setText(result.message or "Local/manual step selected.")
-            self.status_message.emit(result.message or "Local/manual step selected.")
+            self.response_panel.set_status("Tiến trình nội bộ/thủ công. Tính năng nhập phản hồi bị tắt.")
+            self.workflow_status.setText(result.message or "Đã chọn tiến trình nội bộ/thủ công.")
+            self.status_message.emit(result.message or "Đã chọn tiến trình nội bộ/thủ công.")
             return
 
         self.response_panel.set_validate_enabled(True)
         self.response_panel.set_import_enabled(False)
-        self.response_panel.set_status("Paste a response and validate it before import.")
-        self.workflow_status.setText(f"Prompt ready for step '{result.step_id}'.")
-        self.status_message.emit(f"Generated prompt for {result.step_id}.")
+        self.response_panel.set_status("Dán phản hồi của AI và thực hiện Kiểm Tra trước khi nhập.")
+        self.workflow_status.setText(f"Prompt đã sẵn sàng cho bước '{result.step_id}'.")
+        self.status_message.emit(f"Đã tạo prompt cho {result.step_id}.")
 
     def _copy_prompt(self) -> None:
         text = self.prompt_preview.toPlainText().strip()
         if not text:
-            self._show_message("No prompt text is available to copy.")
+            self._show_message("Không có nội dung prompt nào để sao chép.")
             return
         QApplication.clipboard().setText(text)
-        self.workflow_status.setText("Prompt copied to clipboard.")
-        self.status_message.emit("Prompt copied to clipboard.")
+        self.workflow_status.setText("Đã sao chép prompt vào bộ nhớ tạm.")
+        self.status_message.emit("Đã sao chép prompt vào bộ nhớ tạm.")
 
     def _validate_response(self) -> None:
         if self.workflow_service is None:
-            self._show_message("Workflow service is not available.")
+            self._show_message("Dịch vụ quy trình dịch thuật không khả dụng.")
             return
         if not self.generated_step_id or self.generated_is_local:
-            self._show_message("Generate a prompt for a prompt-backed step before validating a response.")
+            self._show_message("Vui lòng tạo Prompt cho bước dùng AI trước khi thực hiện Kiểm Tra.")
             return
 
         text = self.response_panel.response_text().strip()
         if not text:
-            self._show_message("Please paste a response before validating.")
+            self._show_message("Vui lòng dán phản hồi của AI trước khi kiểm tra.")
             return
 
         try:
@@ -273,24 +289,24 @@ class PromptStudioPage(QWidget):
         except Exception as exc:
             self.parsed_response = None
             self.response_panel.set_import_enabled(False)
-            self.response_panel.set_status("Response is not valid JSON for this workflow.")
-            self._show_error("Response validation failed.", exc)
+            self.response_panel.set_status("Phản hồi không phải là JSON hợp lệ cho quy trình này.")
+            self._show_error("Kiểm tra phản hồi thất bại.", exc)
             return
 
         self.response_panel.set_import_enabled(True)
-        self.response_panel.set_status("Response is valid and ready to import.")
-        self.workflow_status.setText("Response validated successfully.")
-        self.status_message.emit("Response validated successfully.")
+        self.response_panel.set_status("Phản hồi hợp lệ và sẵn sàng nhập vào hệ thống.")
+        self.workflow_status.setText("Kiểm tra phản hồi thành công.")
+        self.status_message.emit("Kiểm tra phản hồi thành công.")
 
     def _import_response(self) -> None:
         if self.workflow_service is None or self.current_context is None:
-            self._show_message("Workflow context is not available.")
+            self._show_message("Bối cảnh quy trình dịch thuật không khả dụng.")
             return
         if not self.generated_step_id or self.generated_is_local:
-            self._show_message("The selected step is local/manual and cannot import a response.")
+            self._show_message("Bước đã chọn là tiến trình nội bộ và không thể nhập phản hồi.")
             return
         if self.parsed_response is None:
-            self._show_message("Validate the response before importing it.")
+            self._show_message("Vui lòng kiểm tra phản hồi trước khi nhập bản dịch.")
             return
 
         try:
@@ -300,34 +316,38 @@ class PromptStudioPage(QWidget):
                 self.parsed_response,
             )
         except Exception as exc:
-            self._show_error("Failed to import response.", exc)
+            self._show_error("Nhập phản hồi thất bại.", exc)
             return
 
         self.parsed_response = None
         self.response_panel.set_import_enabled(False)
-        self.response_panel.set_status(outcome.message)
-        self.workflow_status.setText(outcome.message)
-        self.status_message.emit(outcome.message)
+        # Tự động Việt hóa các thông báo thành công thường gặp từ lõi hệ thống nếu có thể, hoặc hiển thị nguyên bản
+        msg = outcome.message
+        if "Imported" in msg:
+            msg = msg.replace("Imported", "Đã nhập thành công").replace("for scope", "cho phạm vi").replace("step", "bước")
+        self.response_panel.set_status(msg)
+        self.workflow_status.setText(msg)
+        self.status_message.emit(msg)
         self.import_completed.emit()
         self.workflow_changed.emit()
 
     def _run_local_action(self) -> None:
         if self.workflow_service is None or self.current_context is None:
-            self._show_message("Workflow context is not available.")
+            self._show_message("Bối cảnh quy trình dịch thuật không khả dụng.")
             return
 
         step = self.step_selector.selected_step()
         if step is None:
-            self._show_message("Please select a step first.")
+            self._show_message("Vui lòng chọn bước thực hiện trước.")
             return
         if not step.is_local_action:
-            self._show_message("The selected step is prompt-backed. Use Generate Prompt instead.")
+            self._show_message("Bước đã chọn dùng AI Prompt. Vui lòng bấm Tạo Prompt thay thế.")
             return
 
         try:
             outcome = self.workflow_service.run_local_action(step.id, self.current_context)
         except Exception as exc:
-            self._show_error("Failed to run local action.", exc)
+            self._show_error("Chạy tiến trình nội bộ thất bại.", exc)
             return
 
         self._apply_local_action_result(step, outcome)
@@ -340,7 +360,7 @@ class PromptStudioPage(QWidget):
         self.response_panel.set_import_enabled(False)
         if self.generated_step_id and not self.generated_is_local:
             self.response_panel.set_validate_enabled(True)
-        self.status_message.emit("Response cleared.")
+        self.status_message.emit("Đã xóa nội dung phản hồi.")
 
     def _reset_generated_state(self, clear_response: bool) -> None:
         self.generated_step_id = None
@@ -354,7 +374,7 @@ class PromptStudioPage(QWidget):
         if clear_response:
             self.response_panel.clear_response()
         else:
-            self.response_panel.set_status("Generate a prompt for a prompt-backed step to enable validation.")
+            self.response_panel.set_status("Tạo Prompt cho một bước dùng AI để kích hoạt tính năng kiểm tra.")
 
     def _apply_local_action_result(self, step: Step, outcome: LocalActionResult) -> None:
         self.generated_step_id = None

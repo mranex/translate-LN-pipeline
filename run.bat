@@ -1,0 +1,1 @@
+python -m manual_studio.qt_app

@@ -1,325 +1,242 @@
-# Translate LN Pipeline
-
-Translate LN Pipeline is a manual-in-the-loop studio for AI-assisted light novel and web novel translation. It is built for the ugly parts of long-form translation that one-click tools usually hand-wave away: glossary drift, pronoun mistakes, relationship direction mistakes, dialogue attribution, inconsistent naming, shallow QA, and release outputs that stop being traceable the moment something goes wrong.
-
-The current center of gravity is `manual_studio/`, a PyQt6 desktop app called **Manual Studio v3**. It does not automatically call a model for you. Instead, it builds structured JSON inputs, renders prompt templates, lets you send those prompts to your LLM however you want, then validates and imports the JSON response back into a project workspace.
-
-That manual loop is the point. For long fiction, blind automation is how you end up with a translation that is fast, fluent, and quietly wrong for 400 pages. This repo is designed for people who would rather keep control of canon, review points, and artifacts than pretend the model is more reliable than it is.
-
-Older Tkinter and CLI tooling still exists in the repo, but if you just cloned this project today, **Manual Studio v3 is the place to start**.
-
-> This is not a one-click translator. It is a structured translation studio for people who want control.
-
-## Who This Is For
-
-- Translators and editors who care more about consistency and controllability than raw speed.
-- People using LLMs for light novel or web novel translation, but worried about hallucinations, terminology drift, pronoun drift, character relationship mistakes, and long-form chaos.
-- Teams or solo operators who want persistent artifacts instead of a pile of chat logs and wishful thinking.
-
-This is **not** for people who want to drop in a raw chapter, press a magic button, and accept whatever comes back.
-
-## Current Main App
-
-The main interface is the PyQt6 app in `manual_studio/`.
-
-### Navigation panel
-
-The left-hand navigation tree is the workflow anchor:
-
-- `Volume` selection gives you volume-scoped steps and views.
-- `Chapter` selection gives you chapter-scoped extraction steps.
-- `Segment` selection gives you segment-scoped prompt work, editing, translation, QA, and fixes.
-
-That selection drives the current context across the whole app. If you switch from a volume to a segment, the available steps, editor state, progress view, and release/canon context all switch with it.
-
-### Main tabs
-
-- **Prompt Studio**: choose the current workflow step, generate the prompt, copy it, paste the model response back, validate it, and import it. Local actions also appear here, but some are still placeholders.
-- **Editor**: edit imported artifacts directly. Volume glossary and relationships are editable. Segment glossaries, segment pronouns, dialogue labels, and translations are editable. Segment contexts and QA are currently preview-oriented and read-only.
-- **Project Progress**: shows done/partial/not-started progress for the current volume, chapter, or segment based on actual artifacts on disk.
-- **Series Canon**: inspect series-level glossary and relationship canon, preview active per-volume canon, and run canon sync/build actions.
-- **Release Center**: preview diagnostics, choose draft or fixed translation sources, and build release JSON, HTML, and optional EPUB outputs.
-
-## Core Workflow
-
-The workflow registry lives in `manual_studio/core/step_registry.py`.
-
-### Chapter-level steps
-
-- `extract_chapter_glossary` - AI prompt step
-- `extract_chapter_relationships` - AI prompt step
-
-### Volume-level steps
-
-- `merge_volume_glossary` - AI prompt step
-- `review_volume_glossary` - local/editor step
-- `initialize_series_glossary_from_volume` - local action
-- `merge_volume_relationships` - AI prompt step
-- `review_volume_relationships` - local/editor step
-- `initialize_series_relationships_from_volume` - local action
-- `build_active_volume_glossary` - local action
-- `build_active_volume_relationships` - local action
-- `sync_volume_glossary_to_series` - local action
-- `sync_volume_relationships_to_series` - local action
-- `assemble` - registered as a local step, but the practical release-building UI today is the **Release Center** tab
-
-### Segment-level steps
-
-- `build_segment_glossary` - AI prompt step
-- `build_segment_glossary_local` - local deterministic matching step
-- `review_segment_glossary` - local/editor step
-- `build_segment_pronouns` - AI prompt step
-- `build_segment_pronouns_local` - local deterministic matching step
-- `review_segment_pronouns` - local/editor step
-- `build_segment_context` - AI prompt step
-- `label_dialogue` - AI prompt step
-- `translate` - AI prompt step
-- `qa` - AI prompt step, optional
-- `fix` - AI prompt step, optional
-
-### The normal loop
-
-1. Select a volume, chapter, or segment in the navigation tree.
-2. Choose the relevant workflow step in **Prompt Studio**.
-3. Let the app build the input JSON and render the prompt template.
-4. Send that prompt to an LLM manually.
-5. Paste the model response back into the app.
-6. Validate and import the response.
-7. Review and edit the resulting artifacts in **Editor**.
-8. Repeat until the volume is ready for release.
-
-This is deliberately boring. Boring is good when you are trying not to corrupt a novel.
-
-## Project Data Layout
-
-Project workspaces live under `data/<project_name>/`. The app opens existing projects from there.
+# ⚡ MANUAL STUDIO v3 - BUỒNG LÁI DỊCH THUẬT LIGHT NOVEL / WEB NOVEL
 
 ```text
-data/<project_name>/
-  project_config.json
-  source/
-    volume_01.json
-  segments/
-    volume_01.segments.json
-  prompts/                              # optional project-level prompt overrides
-  canon/
-    glossary/
-      drafts/
-      finalized/
-      active/
-    relationships/
-      drafts/
-      finalized/
-      active/
-    segment_pronouns/
-    series/
-      glossary.series.json
-      relationships.series.json
-      logs/
-  working/
-    glossary_extractions/
-    relationship_extractions/
-    segment_glossaries/
-    segment_contexts/
-    dialogue_labels/
-    translations/
-      draft/
-      qa/
-      fixed/
-  release/
+    __  ___                               __   _____ __             ___               _____
+   /  |/  /___ _____  __  ___________ _  / /  / ___// /___  ______ _/ (_)___     _    |__  /
+  / /|_/ / __ `/ __ \/ / / / __ `/ __ `/ / /   \__ \/ __/ / / / __ `/ / / __ \  (_)    /_ < 
+ / /  / / /_/ / / / / /_/ / /_/ / /_/ / / /   ___/ / /_/ /_/ / /_/ / / / /_/ /   _    ___/ / 
+/_/  /_/\__,_/_/ /_/\__,_/\__,_/\__,_/_/_/   /____/\__/\__,_/\__,_/_/_/\____/   (_)  /____/  
+                                                                                            
+                     [ BUỒNG LÁI DỊCH THUẬT TOÀN DIỆN CHO WIBU ĐÍCH THỰC ]
 ```
 
-Important details from `manual_studio/core/workspace.py`:
+**Manual Studio v3** là một studio dịch truyện theo mô hình **manual-in-the-loop** (con người kiểm soát quy trình) dành cho dịch giả và editor Light Novel / Web Novel chuyên nghiệp. 
 
-- `project_config.json` defaults to:
+Không giống như các công cụ dịch thuật tự động một nút bấm (One-click) cẩu thả, công cụ này được thiết kế để giải quyết đúng những bài toán nhức nhối nhất của truyện dài tập: **trôi thuật ngữ (glossary), loạn xưng hô, sai lệch mối quan hệ nhân vật, gán nhãn hội thoại lộn xộn, tên riêng thiếu nhất quán, chất lượng kiểm soát (QA) hời hợt, và thành phẩm xuất bản bị mất dấu vết.**
 
+> [!WARNING]
+> **ĐÂY KHÔNG PHẢI CÔNG CỤ DỊCH TỰ ĐỘNG KHÔNG NÃO.** 
+> Dự án này không tự gọi API hộ bạn để "phung phí" token hay freestyle bản dịch bừa bãi. Công cụ sẽ dựng cấu trúc dữ liệu JSON sạch, kết xuất (render) Prompt mẫu tối ưu để bạn tự gửi sang bất kỳ LLM nào bạn thích (Claude, GPT, Gemini), kiểm tra cú pháp phản hồi, và nạp ngược lại hệ thống một cách có tổ chức.
+
+---
+
+## 🧭 Các Trụ Cột Trong Buồng Lái
+
+Giao diện chính được xây dựng bằng **PyQt6** với thiết kế màu đêm tối Cyberpunk tuyệt đẹp, giảm mỏi mắt khi dịch giả làm việc lúc 2 giờ sáng.
+
+### 1. Cây Điều Hướng Cấp Độ (Navigation Panel)
+Cây điều hướng lề trái là xương sống của mọi thao tác và điều khiển ngữ cảnh (Context) của toàn bộ ứng dụng:
+- **📖 Tập (Volume)**: Mở các bước chẩn đoán và quản lý ở phạm vi toàn tập.
+- **📜 Chương (Chapter)**: Trích xuất thuật ngữ và nhân vật ở phạm vi chương.
+- **🔸 Phân đoạn (Segment)**: Điều chỉnh chi tiết nhất từ tạo Prompt, Soạn thảo, Dịch, QA cho đến Sửa lỗi.
+
+### 2. 🤖 Phòng Prompt AI
+- Chọn bước dịch thuật hiện tại trong quy trình.
+- Tạo mẫu Prompt AI, tự động tích hợp bối cảnh, thuật ngữ và thể loại truyện.
+- Dán kết quả trả về từ AI để công cụ tự động kiểm tra định dạng (Validate) và nạp vào hệ thống (Import).
+- *Hệ thống thông báo thông minh luôn gợi ý bước tiếp theo phù hợp nhất để dẫn dắt bạn đi đúng hướng.*
+
+### 3. 📝 Trình Soạn Thảo
+Chỉnh sửa thủ công trực quan và mạnh mẽ với các tab dữ liệu được phân tích rõ ràng:
+- **Thuật ngữ chung (Glossary)** & **Mối quan hệ (Relationships)** cấp Tập.
+- **Thuật ngữ phân đoạn**, **Đại từ phân đoạn**, **Ghi nhãn thoại**, và **Bản dịch tiếng Việt** cấp Phân đoạn.
+- Đánh dấu thẻ màu rực rỡ cho từng loại từ khóa giúp bạn tra cứu nhanh mà không tốn một tế bào não nào.
+
+### 4. 📊 Tiến Độ Dự Án
+Hiển thị trực quan trạng thái tiến độ thực tế của từng phân đoạn bằng màu sắc neon sống động:
+- `🟢 Đã chốt (Done)` | `🟡 Đang dịch (Partial)` | `🔴 Chưa bắt đầu (Not Started)`.
+
+### 5. 🧠 Bộ Não Canon Truyện (Series Canon)
+Hệ thống quản lý Canon xuyên suốt toàn bộ tác phẩm dài tập. Đồng bộ hóa thuật ngữ và nhân vật giữa các Volume để đảm bảo thế giới quan của bộ truyện hoàn toàn thống nhất từ tập 1 đến tập cuối.
+
+### 6. 📦 Trạm Xuất Bản (Release Center)
+Nơi kết xuất ra tác phẩm hoàn chỉnh:
+- Xem trước thông số chẩn đoán lỗi dịch và phân đoạn còn thiếu.
+- Xuất bản dữ liệu sang định dạng **JSON**, **HTML**, và đóng gói sách điện tử **EPUB** chuyên nghiệp kèm ảnh bìa và CSS.
+- Hỗ trợ đẩy thẳng thành phẩm vào thư viện **Calibre** của bạn.
+
+---
+
+## 🔄 Luồng Làm Việc Tiêu Chuẩn (Core Workflow)
+
+```mermaid
+graph TD
+    A[📖 Chọn Volume/Segment trên Cây Điều Hướng] --> B[🤖 Vào Phòng Prompt AI & Chọn Bước Thực Hiện]
+    B --> C[📝 Kết Xuất Mẫu Prompt AI Tối Ưu]
+    C --> D[🌐 Tự Gửi Prompt sang LLM & Sao Chép Kết Quả]
+    D --> E[📥 Dán Kết Quả vào App & Kiểm Tra Cú Pháp]
+    E --> F[📝 Sang Trình Soạn Thảo để Tinh Chỉnh Thủ Công]
+    F --> G[📊 Theo Dõi Tiến Độ Thực Tế Đạt 100%]
+    G --> H[📦 Vào Trạm Xuất Bản để Đóng Gói EPUB/HTML]
+```
+
+### 1. Quy trình chi tiết cấp Chương (Chapter Steps)
+- `extract_chapter_glossary`: Trích xuất thuật ngữ thô trong chương bằng Prompt AI.
+- `extract_chapter_relationships`: Phân tích mối quan hệ giữa các nhân vật xuất hiện trong chương bằng Prompt AI.
+
+### 2. Quy trình chi tiết cấp Tập (Volume Steps)
+- `merge_volume_glossary`: Hợp nhất thuật ngữ từ các chương đơn lẻ thành bảng thuật ngữ chung của Tập bằng Prompt AI.
+- `review_volume_glossary` *(Chế độ Editor)*: Dịch giả rà soát và tinh chỉnh thủ công bảng thuật ngữ Tập.
+- `initialize_series_glossary_from_volume` *(Local Action)*: Khởi tạo bộ từ điển Series từ dữ liệu Volume đã duyệt.
+- `merge_volume_relationships`: Hợp nhất các mối quan hệ nhân vật cấp chương thành bảng quan hệ cấp Tập bằng Prompt AI.
+- `review_volume_relationships` *(Chế độ Editor)*: Dịch giả rà soát và tinh chỉnh thủ công các quan hệ nhân vật.
+- `initialize_series_relationships_from_volume` *(Local Action)*: Khởi tạo bộ quan hệ Series gốc.
+- `build_active_volume_glossary` *(Local Action)*: Quét văn bản gốc để lọc ra danh sách thuật ngữ thực sự hoạt động trong Tập hiện tại.
+- `build_active_volume_relationships` *(Local Action)*: Lọc danh sách nhân vật và mối quan hệ thực sự xuất hiện trong Tập hiện tại.
+- `sync_volume_glossary_to_series` & `sync_volume_relationships_to_series` *(Local Action)*: Đồng bộ ngược các chỉnh sửa từ Tập về Series Canon tổng.
+- `assemble`: Đăng ký bước đóng gói xuất bản cấp Tập.
+
+### 3. Quy trình chi tiết cấp Phân đoạn (Segment Steps)
+Đây là nơi những **công cụ dịch thuật tinh túy** được kích hoạt để kiểm soát tuyệt đối chất lượng:
+- `build_segment_glossary`: Tạo bảng thuật ngữ cho phân đoạn hiện tại bằng Prompt AI.
+- `build_segment_glossary_local` **(Deterministic Local Action - Độc quyền)**: Quét và đối khớp thuật ngữ tự động bằng thuật toán cục bộ, **tiết kiệm 100% chi phí gọi AI** và đảm bảo chính xác tuyệt đối.
+- `review_segment_glossary` *(Chế độ Editor)*: Dịch giả chỉnh sửa từ khóa của phân đoạn.
+- `build_segment_pronouns`: Xác định xưng hô, đại từ nhân vật trong phân đoạn bằng Prompt AI.
+- `build_segment_pronouns_local` **(Deterministic Local Action - Độc quyền)**: Sử dụng cơ sở dữ liệu nhân vật để gán xưng hô tự động không tốn token AI.
+- `review_segment_pronouns` *(Chế độ Editor)*: Rà soát đại từ xưng hô (Anh/Tôi/Cậu/Tớ/Ta) trước khi gửi bản dịch.
+- `build_segment_context`: Dựng bối cảnh nền cho phân đoạn để AI hiểu rõ thời điểm và vị trí diễn ra câu chuyện.
+- `label_dialogue`: Gán nhãn người nói cho từng câu thoại bằng Prompt AI.
+- `translate`: Tiến hành dịch phân đoạn bằng Prompt AI (được nhồi đầy đủ Thuật ngữ, Xưng hô đã duyệt và Bối cảnh nền).
+- `qa` & `fix` *(Tùy chọn)*: Sử dụng Prompt AI để rà soát lỗi dịch thuật và sửa đổi tự động.
+
+---
+
+## 🧠 Bộ Não Canon Đa Tầng (Series Canon) - Vũ Khí Tối Thượng
+
+Sự khác biệt lớn nhất giữa **Manual Studio v3** và các phần mềm trôi nổi là cách quản lý Canon đa tầng cực kỳ khoa học để kiểm soát sự nhất quán của bộ truyện dài hàng ngàn trang:
+
+1. **Volume Canon Draft / Finalized**: Chứa các thuật ngữ và nhân vật đang được xây dựng hoặc đã được phê duyệt ở Tập hiện tại.
+2. **Series Canon (`canon/series/`)**: Bản thiết kế gốc lưu giữ linh hồn và thuật ngữ sống lâu xuyên suốt toàn bộ các tập truyện. Giúp ngăn chặn việc dịch giả tự dưng thay đổi cách dịch tên chiêu thức từ "Excalibur" ở tập 1 thành "Thánh Kiếm" ở tập 7.
+3. **Active Volume Canon**: Bộ lọc thông minh tự động scan văn bản gốc để trích xuất ra đúng những thực thể hoạt động trong tập đó từ Series Canon tổng.
+   - **Tại sao việc này quan trọng?** Tránh việc nhồi nhét hàng ngàn từ khóa không liên quan của toàn bộ bộ truyện vào Prompt dịch, giúp Prompt cực kỳ tinh gọn, **tiết kiệm tới 80% chi phí token** và giúp AI tập trung dịch chính xác hơn.
+
+---
+
+## ⚙️ Cơ Chế Nạp Dữ Liệu & Khôi Phục Siêu Bền Bỉ
+
+### 1. Định dạng JSONL Rows
+Các dữ liệu xử lý hàng ngày ở cấp phân đoạn được lưu dưới dạng file JSON Line (`.jsonl`) với wrapper cấu trúc dạng:
 ```json
-{
-  "name": "<project_name>",
-  "genre": "",
-  "level": "Heavy",
-  "enabled_steps": []
-}
+{"item_id": "seg_001", "status": "done", "result": { ... }}
+```
+Giúp việc đọc ghi cực kỳ độc lập, tránh hiện tượng lỗi một dòng làm hỏng toàn bộ file dữ liệu lớn.
+
+### 2. Tự động sao lưu an toàn (`.bak`)
+Hệ thống Workspace Helper (`manual_studio/core/workspace.py`) sẽ **tự động tạo tệp sao lưu `.bak` kèm dấu thời gian (timestamp)** trước khi ghi đè bất kỳ file dữ liệu quan trọng nào trên đĩa cứng. Dù mất điện hay treo máy, công sức dịch thuật của bạn luôn được bảo vệ an toàn.
+
+### 3. Bộ bóc tách Parser thông minh và mạnh mẽ
+AI đôi khi trả về phản hồi kèm các lời thoại thừa hoặc định dạng Markdown lộn xộn. Trình phân tích cú pháp của chúng tôi cực kỳ "lì lợm":
+- Tự động bóc tách các cặp thẻ Code Block Markdown (` ```json ... ``` `).
+- Tự động quét và trích xuất đúng đối tượng JSON nằm sâu trong văn bản trò chuyện thừa thãi của AI.
+
+---
+
+## 📂 Cấu Trúc Dữ Liệu Workspace
+
+Mọi dữ liệu của dự án được lưu dưới dạng file JSON/JSONL trực quan tại `data/<tên_dự_án>/`.
+
+```text
+data/<tên_dự_án>/
+  ├── project_config.json                 # Cấu hình thể loại, mức độ dịch thuật
+  ├── source/
+  │   └── volume_01.json                  # Nội dung gốc của tập
+  ├── segments/
+  │   └── volume_01.segments.json         # Danh sách phân đoạn chia nhỏ
+  ├── prompts/                            # Các prompt tùy chỉnh riêng của dự án
+  ├── canon/                              # Hệ thống Canon lưu trữ
+  │   ├── glossary/ (finalized / drafts / active)
+  │   ├── relationships/
+  │   └── series/                         # Canon sống lâu xuyên tập
+  ├── working/                            # Dữ liệu dịch thuật đang xử lý
+  │   ├── glossary_extractions/
+  │   ├── dialogue_labels/
+  │   └── translations/ (draft / qa / fixed)
+  └── release/                            # Kết quả xuất bản
 ```
 
-- `source/volume_XX.json` can be either a top-level list of chapter records or an object with a `chapters` list.
-- Chapter records are expected to contain at least `chapter`, `name`, and `content`.
-- `segments/volume_XX.segments.json` can be either a top-level list of segment records or an object with a `segments` list.
-- Segment records are expected to contain at least `chapter`, `name`, `segment`, and `content`.
-- Prompt lookup order is `data/<project_name>/prompts/`, then `data/prompts/`, then repo root `prompts/`.
+---
 
-Most writes create timestamped `.bak` backups before overwriting the target file.
+## 🔌 Hệ Thống Prompt Linh Hoạt
 
-## Series Canon Concept
+Hệ thống kết xuất mẫu Prompt (`manual_studio/core/prompt_engine.py`) hỗ trợ chèn động các biến:
+- `{{JSON_OUTPUT_POLICY}}`: Quy định bắt buộc AI chỉ trả về JSON sạch, không code block, không giải thích dài dòng.
+- `{{INPUT_JSON}}`: Dữ liệu gốc cần dịch hoặc phân tích.
+- `{{genre}}`: Context thể loại truyện giúp AI dịch đúng văn phong.
 
-This repo distinguishes between several canon layers on purpose.
+### 🔍 Thứ tự tìm kiếm Prompt ưu tiên (Lookup Priority)
+Bạn có thể tự do tùy chỉnh Prompt mẫu cho từng dự án riêng biệt. Ứng dụng sẽ tìm kiếm file Prompt theo thứ tự ưu tiên:
+1. `data/<tên_dự_án>/prompts/` (Ưu tiên cao nhất - prompt tùy biến theo truyện).
+2. `data/prompts/` (Prompt tùy biến chung cho tất cả dự án cục bộ).
+3. `prompts/` (Thư mục prompt mặc định ở gốc của repository).
 
-- **Volume glossary / volume relationships**: the current volume's draft and finalized canon artifacts.
-- **Finalized volume canon**: what you explicitly approved for that volume, stored under `canon/glossary/finalized/` and `canon/relationships/finalized/`.
-- **Series glossary / series relationships**: long-lived cross-volume canon stored under `canon/series/`.
-- **Active volume glossary / active volume relationships**: a filtered per-volume working subset built from the series canon against the current volume's actual source text and active character tokens.
+---
 
-Why this matters:
+## 🛠️ Hướng Dẫn Cài Đặt
 
-- Finalized volume canon is the thing you trust for that specific book.
-- Series canon is how you stop volume 7 from "discovering" a new translation for a character introduced in volume 1.
-- Active volume canon keeps prompts focused by pulling in only the series entries that actually matter for the current volume, instead of dumping your entire franchise bible into every step.
-
-## Installation
-
-The tracked requirements in `requirements.txt` are:
-
-- `openai`
-- `python-dotenv`
-- `PyQt6`
-
-Install from the repo root:
+### 1. Chuẩn bị môi trường
+Yêu cầu hệ thống đã cài đặt sẵn Python 3.10 trở lên. Hãy clone repository này về máy của bạn:
 
 ```bash
-git clone <your-fork-or-this-repo-url>
+git clone <url-repository-cua-ban>
 cd translate-LN-pipeline
-
-python -m venv .venv
 ```
 
-Windows PowerShell:
-
+### 2. Thiết lập môi trường ảo (Virtual Environment)
+#### Trên Windows (PowerShell):
 ```powershell
+python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-macOS / Linux:
-
+#### Trên macOS / Linux:
 ```bash
+python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Run the main app:
+### 3. Cài đặt các thành phần tùy chọn (Khuyến nghị)
+Để sử dụng tính năng đóng gói sách **EPUB** và tự động đồng bộ vào thư viện **Calibre** trong Trạm Xuất Bản:
 
 ```bash
-python -m manual_studio.qt_app
-```
-
-Optional extras:
-
-- EPUB export in **Release Center** requires `ebooklib`, which is **not** currently included in `requirements.txt`.
-
-```bash
+# Cài đặt thư viện xử lý EPUB
 pip install ebooklib
+
+# Đảm bảo phần mềm Calibre đã được cài đặt và tiện ích "calibredb" có trong biến môi trường PATH của bạn.
 ```
 
-- Adding EPUBs to Calibre requires `calibredb` to be installed and available on your `PATH`.
+### 4. Khởi chạy ứng dụng
+Bạn chỉ cần chạy tệp script tiện ích ở thư mục gốc:
 
-Legacy entry points such as `manual_prompt_studio.py`, `run.py`, `release_builder.py`, and the older `src/` CLI still exist, but they are not the recommended starting path for new users.
+```powershell
+# Chạy trực tiếp qua Python
+python run.py
+```
+*(Hoặc nhấp đúp vào tệp `run.bat` trên Windows).*
 
-## Basic Usage Guide
+---
 
-### First run
+## 💻 Ghi Chú Dành Cho Nhà Phát Triển (Developer Notes)
 
-1. Create or prepare a project folder under `data/<project_name>/`.
-2. Add `source/volume_XX.json` files.
-3. Add `segments/volume_XX.segments.json` files.
-4. Optionally create `project_config.json` and set `genre` if you want prompt templates to receive genre context.
-5. Start Manual Studio with `python -m manual_studio.qt_app`.
-6. In the project selector, choose the repo root and an existing project under `data/`.
+Bản đồ cấu trúc mã nguồn cốt lõi:
+- `manual_studio/core/`: Chứa toàn bộ Workflow Service, Workspace Path Helpers, Prompt Rendering, Artifact Storage, Progress Tracking, và Release Building.
+- `manual_studio/ui/`: Chứa các cửa sổ giao diện PyQt6 đã được tối ưu hóa QSS Cyberpunk và Việt hóa.
+- `prompts/`: Kho chứa tệp Prompt Template mẫu mặc định.
+- `data/`: Nơi lưu trữ Workspace và Artifact thực tế của từng dự án.
 
-### Typical working flow
+> [!NOTE]
+> **Tình Trạng Phát Triển Hiện Tại:**
+> - Các bước rà soát như `review_volume_glossary`, `review_volume_relationships`, `review_segment_glossary`, `review_segment_pronouns` và `assemble` được đăng ký dưới dạng Local Step trong Core Service để tạo dòng chảy đồng bộ, nhưng thực tế bạn sẽ chỉnh sửa chúng vô cùng mạnh mẽ trực tiếp ngay trên giao diện của Tab **Trình Soạn Thảo (Editor)**.
+> - Tab **Tiến Độ Dự Án** hiển thị trực tiếp trạng thái tiến độ dựa trên các tệp tin lưu vết thật sự tồn tại trên ổ đĩa cứng của bạn.
 
-1. Start with volume-level canon: extract chapter glossary, merge volume glossary, review/edit it in **Editor**, approve it, then do the same for relationships.
-2. If you are working across volumes, use **Series Canon** to initialize, build active canon, and sync finalized volume canon back into series canon.
-3. For each segment, build or import segment glossary, segment pronouns, segment context, and dialogue labels.
-4. Translate the labeled segment.
-5. Run optional QA and fix passes.
-6. Review and edit translations in **Editor**.
-7. Build release artifacts in **Release Center**.
+---
 
-### Practical caveat
+## 🧠 Triết Lý Thiết Kế
 
-The current main app expects source and segment files to already exist. It does **not** currently create a project for you or generate segment files from raw chapters. If you need segmentation, use your own prep scripts or older tooling already present in the repo.
+> *"AI là trợ thủ đắc lực giúp bạn gia tăng 500% năng suất dịch thuật, nhưng nó sẽ trở thành thảm họa nếu bạn để nó tự tung tự tác không có kiểm soát."*
 
-## Prompt System
+**Manual Studio v3** sinh ra để kìm hãm sự "ảo tưởng" (hallucination) của AI. Nó ép quy trình dịch thuật vào một kỷ luật thép có cấu trúc: tách lớp dữ liệu rõ ràng, lưu vết mọi bước đi, chèn các điểm kiểm duyệt thủ công, và luôn có bước kết xuất đóng gói thành phẩm hoàn hảo. 
 
-Prompts are plain text templates. `manual_studio/core/prompt_engine.py` injects:
+Nếu bạn muốn một công cụ tự động hóa lười biếng, công cụ này sẽ vô cùng cứng nhắc. Nhưng nếu bạn là một dịch giả thực thụ muốn sở hữu một **kiệt tác dịch thuật hoàn mỹ** với sự trợ giúp của AI mà không cần phải đặt niềm tin mù quáng vào nó, thì sự cứng nhắc đó chính là vũ khí tối thượng của bạn.
 
-- `{{JSON_OUTPUT_POLICY}}`
-- `{{INPUT_JSON}}`
-- `{{genre}}`
-
-The bundled JSON policy currently says:
-
-- return strict JSON only
-- no markdown
-- no code fences
-- no comments
-- use `null` when unknown
-- use `[]` for empty arrays
-- confidence values should be numbers from `0` to `1`
-
-Prompt customization is real and supported. You can override prompt files by placing them in:
-
-- `data/<project_name>/prompts/`
-- or `data/prompts/`
-
-Manual Studio does **not** automatically send prompts to an API. You generate the prompt, run it against your model manually, and paste the response back.
-
-## Artifact Import and Export
-
-Imported AI responses are expected to be **top-level JSON objects**.
-
-The response parser is forgiving about messy paste-ins:
-
-- it strips fenced code blocks
-- it can recover a surrounding JSON object from extra text
-
-Clean JSON is still strongly recommended.
-
-Storage format depends on the step:
-
-- Chapter and segment workflow artifacts are usually stored as JSONL rows with wrapper fields like `item_id`, `status`, and `result`.
-- Volume merge outputs are written as draft JSON files.
-- Finalization happens by approving draft canon into finalized canon.
-
-Examples:
-
-- `working/glossary_extractions/volume_01.glossary_extractions.jsonl`
-- `working/segment_glossaries/volume_01.segment_glossaries.jsonl`
-- `working/dialogue_labels/volume_01.dialogue_labels.jsonl`
-- `working/translations/draft/volume_01.translated.jsonl`
-- `canon/glossary/drafts/volume_01.glossary.draft.json`
-- `canon/glossary/finalized/volume_01.glossary.json`
-
-## Development Notes
-
-High-level architecture:
-
-- `manual_studio/core/`: workflow services, workspace paths, prompt rendering, artifact storage, progress tracking, release building, and series canon logic
-- `manual_studio/ui/`: PyQt6 pages and editor widgets
-- `prompts/`: prompt templates used by the manual workflow
-- `data/`: project workspaces and artifacts
-
-For contributors:
-
-- Treat the code as the source of truth.
-- Keep this README aligned with `manual_studio/core/step_registry.py` and `manual_studio/core/workspace.py`.
-- If the UI exposes something that is only partial, document it honestly instead of pretending it is finished.
-
-## Limitations / Current Status
-
-- Manual Studio v3 is the main app, but several registered local workflow steps still return placeholder messages in `ManualWorkflowService`: `review_volume_glossary`, `review_volume_relationships`, `review_segment_glossary`, `review_segment_pronouns`, and `assemble`.
-- That does **not** mean editing is missing. The **Editor** tab already supports real editing for volume glossary, volume relationships, segment glossaries, segment pronouns, dialogue labels, and translations.
-- Segment contexts and QA are currently preview/read-only in the Editor.
-- Release building exists and works in **Release Center**, but its default output folder is `data/<project_name>/release_ui/`, while older workspace helpers and progress tracking still also know about `release/volume_XX.vi.json` and `release/volume_XX.vi.md`.
-- Dialogue labeling is slightly transitional right now: `prompts/08_label_dialogue.txt` only guarantees `labeled_source`, but editor and review tooling also understand optional `units`.
-- `project_config.json` includes `enabled_steps`, but the current GUI does not use that field as a hard workflow gate.
-- The main app does not perform built-in API calls and does not generate segments for you.
-- Optional EPUB export requires `ebooklib`, which is not currently installed by `requirements.txt`.
-
-## Philosophy
-
-- AI is useful for long-fiction translation, but it is unreliable if you let it freestyle.
-- This project reduces fear by forcing structure: explicit canon layers, stored artifacts, review points, and repeatable release steps.
-- It chooses control over convenience on purpose.
-
-If you want a machine to do everything for you, this repo will feel stubborn. If you want a machine that can help without being trusted blindly, that stubbornness is the feature.

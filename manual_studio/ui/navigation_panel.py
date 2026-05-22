@@ -26,18 +26,18 @@ class NavigationPanel(QWidget):
         self.empty_label.hide()
 
         if self.index is None:
-            self.empty_label.setText("No workspace loaded.")
+            self.empty_label.setText("Chưa mở dự án nào.")
             self.empty_label.show()
             return
 
         volumes = self.index.list_volumes()
         if not volumes:
-            self.empty_label.setText("No source volumes found for this project.")
+            self.empty_label.setText("Không tìm thấy tập truyện gốc nào cho dự án này.")
             self.empty_label.show()
             return
 
         for volume in volumes:
-            volume_item = QTreeWidgetItem([f"Volume {volume:02d}"])
+            volume_item = QTreeWidgetItem([f"📖 Tập {volume:02d}"])
             volume_item.setData(
                 0,
                 Qt.ItemDataRole.UserRole,
@@ -45,12 +45,13 @@ class NavigationPanel(QWidget):
             )
             self.tree.addTopLevelItem(volume_item)
 
-            chapters_group = QTreeWidgetItem(["Chapters"])
+            chapters_group = QTreeWidgetItem(["📜 Danh sách Chương"])
             chapters_group.setFlags(chapters_group.flags() & ~Qt.ItemFlag.ItemIsSelectable)
             volume_item.addChild(chapters_group)
             for chapter_record in self.index.get_chapter_records(volume):
                 chapter_label = f"c{int(chapter_record.get('chapter', 0)):03d}"
-                chapter_item = QTreeWidgetItem([chapter_label])
+                display_label = f"📜 Chương {int(chapter_record.get('chapter', 0)):02d}"
+                chapter_item = QTreeWidgetItem([display_label])
                 chapter_item.setData(
                     0,
                     Qt.ItemDataRole.UserRole,
@@ -64,11 +65,12 @@ class NavigationPanel(QWidget):
                 )
                 chapters_group.addChild(chapter_item)
 
-            segments_group = QTreeWidgetItem(["Segments"])
+            segments_group = QTreeWidgetItem(["🔸 Danh sách Phân đoạn"])
             segments_group.setFlags(segments_group.flags() & ~Qt.ItemFlag.ItemIsSelectable)
             volume_item.addChild(segments_group)
             for segment_id in self.index.list_segments(volume):
-                segment_item = QTreeWidgetItem([segment_id])
+                display_segment = f"🔸 Đoạn {segment_id}"
+                segment_item = QTreeWidgetItem([display_segment])
                 segment_item.setData(
                     0,
                     Qt.ItemDataRole.UserRole,
@@ -92,7 +94,7 @@ class NavigationPanel(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
-        label = QLabel("Project Navigation")
+        label = QLabel("Điều Hướng Dự Án")
         label.setObjectName("titleLabel")
         layout.addWidget(label)
 

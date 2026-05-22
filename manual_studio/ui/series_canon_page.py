@@ -41,7 +41,7 @@ class CanonListTab(QWidget):
     def set_entries(self, entries: list[dict[str, Any]], title_message: str = "") -> None:
         self.entries = [entry for entry in entries if isinstance(entry, dict)]
         self.title_message = title_message or self.empty_message
-        self.count_label.setText(f"Entries: {len(self.entries)}")
+        self.count_label.setText(f"Số mục: {len(self.entries)}")
         self.status_label.setText(self.title_message if self.entries else self.empty_message)
         self.table.clearContents()
         self.table.setRowCount(len(self.entries))
@@ -65,7 +65,7 @@ class CanonListTab(QWidget):
 
     def clear(self, message: str) -> None:
         self.entries = []
-        self.count_label.setText("Entries: 0")
+        self.count_label.setText("Số mục: 0")
         self.status_label.setText(message)
         self.table.clearContents()
         self.table.setRowCount(0)
@@ -75,7 +75,7 @@ class CanonListTab(QWidget):
         layout = QVBoxLayout(self)
 
         header = QHBoxLayout()
-        self.count_label = QLabel("Entries: 0")
+        self.count_label = QLabel("Số mục: 0")
         self.count_label.setObjectName("mutedLabel")
         self.status_label = QLabel(self.empty_message)
         self.status_label.setObjectName("mutedLabel")
@@ -123,11 +123,11 @@ class SyncReportTab(QWidget):
         self.relationships_report = relationships_report if isinstance(relationships_report, dict) else None
         self.glossary_report_tab.set_entries(
             self._flatten_report_rows(self.glossary_report),
-            self._report_summary(self.glossary_report, "No glossary sync report found for this volume."),
+            self._report_summary(self.glossary_report, "Không tìm thấy báo cáo đồng bộ thuật ngữ cho tập này."),
         )
         self.relationships_report_tab.set_entries(
             self._flatten_report_rows(self.relationships_report),
-            self._report_summary(self.relationships_report, "No relationships sync report found for this volume."),
+            self._report_summary(self.relationships_report, "Không tìm thấy báo cáo đồng bộ đại từ nhân xưng cho tập này."),
         )
         self._emit_report_object()
 
@@ -142,17 +142,17 @@ class SyncReportTab(QWidget):
         layout = QVBoxLayout(self)
         self.report_tabs = QTabWidget()
         report_columns = [
-            ("section", "Section"),
-            ("summary", "Summary"),
-            ("reason", "Reason"),
+            ("section", "Phân Nhóm"),
+            ("summary", "Tóm Tắt"),
+            ("reason", "Lý Do"),
         ]
-        self.glossary_report_tab = CanonListTab(report_columns, "No glossary sync report found for this volume.")
+        self.glossary_report_tab = CanonListTab(report_columns, "Không tìm thấy báo cáo đồng bộ thuật ngữ cho tập này.")
         self.relationships_report_tab = CanonListTab(
             report_columns,
-            "No relationships sync report found for this volume.",
+            "Không tìm thấy báo cáo đồng bộ đại từ nhân xưng cho tập này.",
         )
-        self.report_tabs.addTab(self.glossary_report_tab, "Glossary Report")
-        self.report_tabs.addTab(self.relationships_report_tab, "Relationships Report")
+        self.report_tabs.addTab(self.glossary_report_tab, "Báo Cáo Thuật Ngữ")
+        self.report_tabs.addTab(self.relationships_report_tab, "Báo Cáo Nhân Xưng")
         self.report_tabs.currentChanged.connect(lambda _index: self._emit_report_object())
         self.glossary_report_tab.object_selected.connect(self._forward_selected_object)
         self.relationships_report_tab.object_selected.connect(self._forward_selected_object)
@@ -164,6 +164,7 @@ class SyncReportTab(QWidget):
 
         rows: list[dict[str, Any]] = []
         for section in ("added", "skipped", "conflicts", "ambiguous"):
+            section_vi = "Thêm mới" if section == "added" else ("Bỏ qua" if section == "skipped" else ("Xung đột" if section == "conflicts" else "Mơ hồ"))
             value = report_obj.get(section)
             if not isinstance(value, list):
                 continue
@@ -171,7 +172,7 @@ class SyncReportTab(QWidget):
                 if not isinstance(entry, dict):
                     continue
                 row = dict(entry)
-                row["section"] = section
+                row["section"] = section_vi
                 row["reason"] = str(entry.get("reason", ""))
                 row["summary"] = self._summary_for_report_entry(entry)
                 rows.append(row)
@@ -192,16 +193,17 @@ class SyncReportTab(QWidget):
         identity = entry.get("identity")
         if isinstance(identity, list) and len(identity) == 2:
             return f"{identity[0]} -> {identity[1]}"
-        return "Report entry"
+        return "Mục báo cáo"
 
     def _report_summary(self, report_obj: dict[str, Any] | None, empty_message: str) -> str:
         if not isinstance(report_obj, dict):
             return empty_message
         counts = []
         for section in ("added", "skipped", "conflicts", "ambiguous"):
+            section_vi = "thêm mới" if section == "added" else ("bỏ qua" if section == "skipped" else ("xung đột" if section == "conflicts" else "mơ hồ"))
             value = report_obj.get(section)
             if isinstance(value, list):
-                counts.append(f"{section}={len(value)}")
+                counts.append(f"{section_vi}={len(value)}")
         if not counts:
             return empty_message
         return ", ".join(counts)
@@ -260,7 +262,7 @@ class SeriesCanonPage(QWidget):
         try:
             self.volume_combo.clear()
             for volume in volumes:
-                self.volume_combo.addItem(f"Volume {volume:02d}", volume)
+                self.volume_combo.addItem(f"Tập {volume:02d}", volume)
         finally:
             self.volume_combo.blockSignals(False)
 
@@ -270,23 +272,23 @@ class SeriesCanonPage(QWidget):
                 self._set_volume_value(target_volume)
             else:
                 self.volume_combo.setCurrentIndex(0)
-            self.status_label.setText(f"Loaded {len(volumes)} volume(s) for Series Canon review.")
+            self.status_label.setText(f"Đã tải {len(volumes)} tập để rà soát Canon hệ truyện.")
         else:
-            self.status_label.setText("No source volumes were found for this project.")
+            self.status_label.setText("Không tìm thấy tập dữ liệu gốc nào trong dự án này.")
         self._sync_button_state()
         self.refresh_current_view()
 
     def refresh_current_view(self) -> None:
         volume = self._selected_volume()
         if self.workspace is None or volume is None:
-            message = "Select a project volume to inspect Series Canon artifacts."
+            message = "Chọn một tập truyện để kiểm tra các dữ liệu Canon hệ truyện."
             self.series_glossary_tab.clear(message)
             self.series_relationships_tab.clear(message)
             self.active_glossary_tab.clear(message)
             self.active_relationships_tab.clear(message)
             self.sync_report_tab.clear(message)
             self.raw_json_viewer.clear_placeholder(message)
-            self.summary_label.setText("No volume selected.")
+            self.summary_label.setText("Chưa chọn tập truyện.")
             return
 
         try:
@@ -308,26 +310,26 @@ class SeriesCanonPage(QWidget):
 
         self.series_glossary_tab.set_entries(
             series_glossary.get("volume_merge_glossary", []),
-            "Loaded Series Glossary.",
+            "Đã tải Thuật ngữ Canon hệ truyện.",
         )
         self.series_relationships_tab.set_entries(
             series_relationships.get("relationship_pronoun_canon", []),
-            "Loaded Series Relationships.",
+            "Đã tải Nhân xưng Canon hệ truyện.",
         )
         self.active_glossary_tab.set_entries(
             active_glossary.get("volume_merge_glossary", []),
-            f"Previewed Active Volume Glossary for volume {volume:02d}.",
+            f"Xem trước Thuật ngữ khả dụng cho Tập {volume:02d}.",
         )
         self.active_relationships_tab.set_entries(
             active_relationships.get("relationship_pronoun_canon", []),
-            f"Previewed Active Volume Relationships for volume {volume:02d}.",
+            f"Xem trước Nhân xưng khả dụng cho Tập {volume:02d}.",
         )
         glossary_report = read_json(self.workspace.series_glossary_sync_report(volume), None)
         relationships_report = read_json(self.workspace.series_relationships_sync_report(volume), None)
         self.sync_report_tab.set_reports(glossary_report, relationships_report)
         self.summary_label.setText(
-            f"Volume {volume:02d}: series glossary {len(series_glossary.get('volume_merge_glossary', []))} entries, "
-            f"series relationships {len(series_relationships.get('relationship_pronoun_canon', []))} entries."
+            f"Tập {volume:02d}: Thuật ngữ hệ truyện {len(series_glossary.get('volume_merge_glossary', []))} mục, "
+            f"Nhân xưng hệ truyện {len(series_relationships.get('relationship_pronoun_canon', []))} quy tắc."
         )
 
     def focus_glossary_entry(self, volume: int, entry: dict[str, Any]) -> bool:
@@ -340,12 +342,12 @@ class SeriesCanonPage(QWidget):
             if self.series_service.glossary_entries_overlap(entry, candidate):
                 self.series_glossary_tab.table.selectRow(index)
                 self.raw_json_viewer.set_object(candidate)
-                self._show_message(f"Focused matching Series Glossary entry for volume {volume:02d}.")
+                self._show_message(f"Đã tập trung vào mục Thuật ngữ tương thích hệ truyện cho Tập {volume:02d}.")
                 return True
 
         self.series_glossary_tab.table.clearSelection()
-        self.raw_json_viewer.clear_placeholder("No matching Series Glossary entry was found.")
-        self._show_message(f"No matching Series Glossary entry was found for volume {volume:02d}.")
+        self.raw_json_viewer.clear_placeholder("Không tìm thấy mục Thuật ngữ hệ truyện tương thích.")
+        self._show_message(f"Không tìm thấy mục Thuật ngữ hệ truyện tương thích cho Tập {volume:02d}.")
         return False
 
     def focus_relationship_entry(self, volume: int, entry: dict[str, Any]) -> bool:
@@ -357,31 +359,31 @@ class SeriesCanonPage(QWidget):
         target_identity = self.series_service.relationship_identity(entry)
         if target_identity is None:
             self.series_relationships_tab.table.clearSelection()
-            self.raw_json_viewer.clear_placeholder("The selected relationship does not have a valid directed identity.")
-            self._show_message("The selected relationship does not have a valid directed identity.")
+            self.raw_json_viewer.clear_placeholder("Mối quan hệ được chọn không có nhận diện hướng hợp lệ.")
+            self._show_message("Mối quan hệ được chọn không có nhận diện hướng hợp lệ.")
             return False
 
         for index, candidate in enumerate(self.series_relationships_tab.entries):
             if self.series_service.relationship_identity(candidate) == target_identity:
                 self.series_relationships_tab.table.selectRow(index)
                 self.raw_json_viewer.set_object(candidate)
-                self._show_message(f"Focused matching Series Relationships entry for volume {volume:02d}.")
+                self._show_message(f"Đã tập trung vào mục Nhân xưng tương thích hệ truyện cho Tập {volume:02d}.")
                 return True
 
         self.series_relationships_tab.table.clearSelection()
-        self.raw_json_viewer.clear_placeholder("No matching Series Relationships entry was found.")
-        self._show_message(f"No matching Series Relationships entry was found for volume {volume:02d}.")
+        self.raw_json_viewer.clear_placeholder("Không tìm thấy quy tắc Nhân xưng hệ truyện tương thích.")
+        self._show_message(f"Không tìm thấy quy tắc Nhân xưng hệ truyện tương thích cho Tập {volume:02d}.")
         return False
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        title = QLabel("Series Canon")
+        title = QLabel("Bộ Não Canon Hệ Truyện")
         title.setObjectName("titleLabel")
         layout.addWidget(title)
 
         subtitle = QLabel(
-            "Inspect series-level glossary and relationship canon, preview active volume canon, and run sync operations."
+            "Rà soát thuật ngữ và đại từ nhân xưng ở cấp độ toàn bộ hệ truyện (Series-level), xem trước Canon khả dụng cho từng tập, và thực hiện các thao tác đồng bộ hóa."
         )
         subtitle.setObjectName("mutedLabel")
         subtitle.setWordWrap(True)
@@ -391,16 +393,17 @@ class SeriesCanonPage(QWidget):
 
         controls_panel = QWidget()
         controls_layout = QVBoxLayout(controls_panel)
-        controls_layout.addWidget(QLabel("Volume"))
+        controls_layout.addWidget(QLabel("Tập truyện"))
         self.volume_combo = QComboBox()
         self.volume_combo.currentIndexChanged.connect(self._on_volume_changed)
         controls_layout.addWidget(self.volume_combo)
 
-        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button = QPushButton("Làm Mới")
+        self.refresh_button.setObjectName("aiButton")
         self.refresh_button.clicked.connect(self.refresh_project_data)
         controls_layout.addWidget(self.refresh_button)
 
-        self.initialize_series_button = QPushButton("Initialize Series from Volume")
+        self.initialize_series_button = QPushButton("Khởi Tạo Hệ Truyện Từ Tập")
         self.initialize_series_button.clicked.connect(
             lambda: self._run_action_batch(
                 [
@@ -411,36 +414,36 @@ class SeriesCanonPage(QWidget):
         )
         controls_layout.addWidget(self.initialize_series_button)
 
-        self.build_active_glossary_button = QPushButton("Build Active Glossary")
+        self.build_active_glossary_button = QPushButton("Xây Dựng Thuật Ngữ Khả Dụng")
         self.build_active_glossary_button.clicked.connect(
             lambda: self._run_action_batch(["build_active_volume_glossary"])
         )
         controls_layout.addWidget(self.build_active_glossary_button)
 
-        self.build_active_relationships_button = QPushButton("Build Active Relationships")
+        self.build_active_relationships_button = QPushButton("Xây Dựng Đại Từ Nhân Xưng Khả Dụng")
         self.build_active_relationships_button.clicked.connect(
             lambda: self._run_action_batch(["build_active_volume_relationships"])
         )
         controls_layout.addWidget(self.build_active_relationships_button)
 
-        self.sync_glossary_button = QPushButton("Sync Glossary to Series")
+        self.sync_glossary_button = QPushButton("Đồng Bộ Thuật Ngữ Lên Hệ Truyện")
         self.sync_glossary_button.clicked.connect(
             lambda: self._run_action_batch(["sync_volume_glossary_to_series"])
         )
         controls_layout.addWidget(self.sync_glossary_button)
 
-        self.sync_relationships_button = QPushButton("Sync Relationships to Series")
+        self.sync_relationships_button = QPushButton("Đồng Bộ Nhân Xưng Lên Hệ Truyện")
         self.sync_relationships_button.clicked.connect(
             lambda: self._run_action_batch(["sync_volume_relationships_to_series"])
         )
         controls_layout.addWidget(self.sync_relationships_button)
 
         controls_layout.addStretch(1)
-        self.summary_label = QLabel("No volume selected.")
+        self.summary_label = QLabel("Chưa chọn tập truyện.")
         self.summary_label.setObjectName("mutedLabel")
         self.summary_label.setWordWrap(True)
         controls_layout.addWidget(self.summary_label)
-        self.status_label = QLabel("Select a volume to inspect Series Canon artifacts.")
+        self.status_label = QLabel("Chọn một tập truyện để kiểm tra dữ liệu Canon hệ truyện.")
         self.status_label.setObjectName("mutedLabel")
         self.status_label.setWordWrap(True)
         controls_layout.addWidget(self.status_label)
@@ -449,45 +452,45 @@ class SeriesCanonPage(QWidget):
         center_layout = QVBoxLayout(center_panel)
         self.data_tabs = QTabWidget()
         self.series_glossary_tab = CanonListTab(
-            [("id", "ID"), ("source", "Source"), ("vi", "Vietnamese"), ("type", "Type"), ("status", "Status")],
-            "No Series Glossary entries found.",
+            [("id", "Mã"), ("source", "Từ Gốc"), ("vi", "Tiếng Việt"), ("type", "Phân Loại"), ("status", "Trạng Thái")],
+            "Không tìm thấy mục Thuật ngữ hệ truyện nào.",
         )
         self.series_relationships_tab = CanonListTab(
             [
-                ("id", "ID"),
-                ("speaker", "Speaker"),
-                ("listener", "Listener"),
-                ("relationship", "Relationship"),
-                ("self", "Self"),
-                ("other", "Other"),
+                ("id", "Mã"),
+                ("speaker", "Người Nói"),
+                ("listener", "Người Nghe"),
+                ("relationship", "Mối Quan Hệ"),
+                ("self", "Xưng Mình"),
+                ("other", "Gọi Đối Phương"),
             ],
-            "No Series Relationships entries found.",
+            "Không tìm thấy quy tắc Nhân xưng hệ truyện nào.",
         )
         self.active_glossary_tab = CanonListTab(
-            [("id", "ID"), ("source", "Source"), ("vi", "Vietnamese"), ("type", "Type"), ("status", "Status")],
-            "No Active Volume Glossary entries matched.",
+            [("id", "Mã"), ("source", "Từ Gốc"), ("vi", "Tiếng Việt"), ("type", "Phân Loại"), ("status", "Trạng Thái")],
+            "Không có Thuật ngữ tập nào tương thích.",
         )
         self.active_relationships_tab = CanonListTab(
             [
-                ("id", "ID"),
-                ("speaker", "Speaker"),
-                ("listener", "Listener"),
-                ("relationship", "Relationship"),
-                ("self", "Self"),
-                ("other", "Other"),
+                ("id", "Mã"),
+                ("speaker", "Người Nói"),
+                ("listener", "Người Nghe"),
+                ("relationship", "Mối Quan Hệ"),
+                ("self", "Xưng Mình"),
+                ("other", "Gọi Đối Phương"),
             ],
-            "No Active Volume Relationships matched.",
+            "Không có Nhân xưng tập nào tương thích.",
         )
         self.sync_report_tab = SyncReportTab()
-        self.data_tabs.addTab(self.series_glossary_tab, "Series Glossary")
-        self.data_tabs.addTab(self.series_relationships_tab, "Series Relationships")
-        self.data_tabs.addTab(self.active_glossary_tab, "Active Volume Glossary")
-        self.data_tabs.addTab(self.active_relationships_tab, "Active Volume Relationships")
-        self.data_tabs.addTab(self.sync_report_tab, "Sync Report")
+        self.data_tabs.addTab(self.series_glossary_tab, "Thuật Ngữ Hệ Truyện")
+        self.data_tabs.addTab(self.series_relationships_tab, "Nhân Xưng Hệ Truyện")
+        self.data_tabs.addTab(self.active_glossary_tab, "Thuật Ngữ Khả Dụng Tập")
+        self.data_tabs.addTab(self.active_relationships_tab, "Nhân Xưng Khả Dụng Tập")
+        self.data_tabs.addTab(self.sync_report_tab, "Báo Cáo Đồng Bộ")
         center_layout.addWidget(self.data_tabs)
 
         self.raw_json_viewer = RawJsonViewer()
-        self.raw_json_viewer.clear_placeholder("Select a Series Canon row to inspect its raw JSON.")
+        self.raw_json_viewer.clear_placeholder("Chọn một dòng dữ liệu Canon hệ truyện để xem nội dung JSON gốc.")
 
         for tab in (
             self.series_glossary_tab,
@@ -529,11 +532,11 @@ class SeriesCanonPage(QWidget):
 
     def _run_action_batch(self, step_ids: list[str]) -> None:
         if self.workflow_service is None:
-            self._show_message("Workflow service is not available.")
+            self._show_message("Dịch vụ quy trình (Workflow service) không hoạt động.")
             return
         volume = self._selected_volume()
         if volume is None:
-            self._show_message("Please select a volume first.")
+            self._show_message("Vui lòng chọn một tập truyện trước.")
             return
 
         context = SelectionContext(scope="volume", volume=volume)
@@ -544,7 +547,7 @@ class SeriesCanonPage(QWidget):
                 outcome = self.workflow_service.run_local_action(step_id, context)
                 messages.append(outcome.message)
         except Exception as exc:
-            self._show_error("Series Canon Action Failed", exc)
+            self._show_error("Thao Tác Canon Hệ Truyện Thất Bại", exc)
             return
         finally:
             self._set_busy(False)

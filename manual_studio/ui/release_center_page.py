@@ -67,7 +67,7 @@ class ReleaseCenterPage(QWidget):
         try:
             self.volume_combo.clear()
             for volume in volumes:
-                self.volume_combo.addItem(f"Volume {volume:02d}", volume)
+                self.volume_combo.addItem(f"Tập {volume:02d}", volume)
         finally:
             self.volume_combo.blockSignals(False)
 
@@ -79,11 +79,11 @@ class ReleaseCenterPage(QWidget):
                 self.volume_combo.setCurrentIndex(0)
             self.preview_button.setEnabled(True)
             self.build_button.setEnabled(True)
-            self.volume_status_label.setText(f"Discovered {len(volumes)} volume(s).")
+            self.volume_status_label.setText(f"Đã tìm thấy {len(volumes)} tập truyện.")
         else:
             self.preview_button.setEnabled(False)
             self.build_button.setEnabled(False)
-            self.volume_status_label.setText("No source volumes were found for this project.")
+            self.volume_status_label.setText("Không tìm thấy tập dữ liệu gốc nào trong dự án này.")
 
         if self.workspace is not None:
             if not self.output_dir_edit.text().strip():
@@ -93,15 +93,19 @@ class ReleaseCenterPage(QWidget):
         self._sync_option_states()
         self._update_open_button()
 
+    def _selected_translation_source(self) -> str:
+        val = self.translation_source_combo.currentData()
+        return val if isinstance(val, str) else "fixed_if_available"
+
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        title = QLabel("Release Center")
+        title = QLabel("Trạm Xuất Bản")
         title.setObjectName("titleLabel")
         layout.addWidget(title)
 
         subtitle = QLabel(
-            "Build release JSON, HTML, and optional EPUB outputs from the current manual workflow artifacts."
+            "Xuất bản các định dạng dữ liệu JSON, HTML, và đóng gói EPUB từ các tài liệu dịch thuật của quy trình hiện tại."
         )
         subtitle.setObjectName("mutedLabel")
         subtitle.setWordWrap(True)
@@ -115,55 +119,57 @@ class ReleaseCenterPage(QWidget):
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
 
         self.volume_combo = QComboBox()
-        form.addRow("Volume", self.volume_combo)
+        form.addRow("Tập truyện", self.volume_combo)
 
         self.translation_source_combo = QComboBox()
-        self.translation_source_combo.addItems(["fixed_if_available", "fixed_only", "draft_only"])
-        form.addRow("Translation source", self.translation_source_combo)
+        self.translation_source_combo.addItem("Ưu tiên bản đã sửa (nháp nếu chưa sửa)", "fixed_if_available")
+        self.translation_source_combo.addItem("Chỉ dùng bản đã sửa", "fixed_only")
+        self.translation_source_combo.addItem("Chỉ dùng bản nháp", "draft_only")
+        form.addRow("Nguồn bản dịch", self.translation_source_combo)
 
         output_row = QHBoxLayout()
         self.output_dir_edit = QLineEdit()
         self.output_dir_edit.textChanged.connect(self._update_open_button)
-        self.output_browse_button = QPushButton("Browse...")
+        self.output_browse_button = QPushButton("Tìm...")
         self.output_browse_button.clicked.connect(self._browse_output_dir)
         output_row.addWidget(self.output_dir_edit, 1)
         output_row.addWidget(self.output_browse_button)
-        form.addRow("Output folder", output_row)
+        form.addRow("Thư mục đầu ra", output_row)
 
         self.novel_title_edit = QLineEdit()
-        form.addRow("Novel title", self.novel_title_edit)
+        form.addRow("Tiêu đề truyện", self.novel_title_edit)
 
-        self.author_edit = QLineEdit("Unknown")
-        form.addRow("Author", self.author_edit)
+        self.author_edit = QLineEdit("Chưa rõ")
+        form.addRow("Tác giả", self.author_edit)
 
-        self.copy_css_check = QCheckBox("Copy CSS files into the HTML folder")
+        self.copy_css_check = QCheckBox("Sao chép các tệp CSS vào thư mục HTML")
         self.copy_css_check.toggled.connect(self._sync_option_states)
-        form.addRow("Copy CSS", self.copy_css_check)
+        form.addRow("Sao chép CSS", self.copy_css_check)
 
         css_row = QHBoxLayout()
         self.css_files_edit = QLineEdit()
-        self.css_files_edit.setPlaceholderText("Select one or more CSS files")
-        self.css_browse_button = QPushButton("Browse...")
+        self.css_files_edit.setPlaceholderText("Chọn một hoặc nhiều tệp CSS")
+        self.css_browse_button = QPushButton("Tìm...")
         self.css_browse_button.clicked.connect(self._browse_css_files)
         css_row.addWidget(self.css_files_edit, 1)
         css_row.addWidget(self.css_browse_button)
-        form.addRow("CSS files", css_row)
+        form.addRow("Các tệp CSS", css_row)
 
-        self.pack_epub_check = QCheckBox("Pack an EPUB after writing HTML")
+        self.pack_epub_check = QCheckBox("Đóng gói tệp sách điện tử EPUB sau khi dựng HTML")
         self.pack_epub_check.toggled.connect(self._sync_option_states)
-        form.addRow("Pack EPUB", self.pack_epub_check)
+        form.addRow("Đóng gói EPUB", self.pack_epub_check)
 
         cover_row = QHBoxLayout()
         self.cover_path_edit = QLineEdit()
-        self.cover_path_edit.setPlaceholderText("Optional cover image path")
-        self.cover_browse_button = QPushButton("Browse...")
+        self.cover_path_edit.setPlaceholderText("Đường dẫn ảnh bìa (Không bắt buộc)")
+        self.cover_browse_button = QPushButton("Tìm...")
         self.cover_browse_button.clicked.connect(self._browse_cover)
         cover_row.addWidget(self.cover_path_edit, 1)
         cover_row.addWidget(self.cover_browse_button)
-        form.addRow("Cover", cover_row)
+        form.addRow("Ảnh bìa", cover_row)
 
-        self.add_to_calibre_check = QCheckBox("Add the EPUB to Calibre")
-        form.addRow("Add to Calibre", self.add_to_calibre_check)
+        self.add_to_calibre_check = QCheckBox("Tự động thêm tệp EPUB vào thư viện Calibre")
+        form.addRow("Thêm vào Calibre", self.add_to_calibre_check)
         options_layout.addLayout(form)
 
         self.volume_status_label = QLabel("")
@@ -172,13 +178,14 @@ class ReleaseCenterPage(QWidget):
         options_layout.addWidget(self.volume_status_label)
 
         button_row = QHBoxLayout()
-        self.preview_button = QPushButton("Preview Diagnostics")
+        self.preview_button = QPushButton("Xem Trước Chẩn Đoán")
         self.preview_button.clicked.connect(self._preview_diagnostics)
-        self.build_button = QPushButton("Build Release")
+        self.build_button = QPushButton("Tiến Hành Xuất Bản")
+        self.build_button.setObjectName("aiButton")
         self.build_button.clicked.connect(self._build_release)
-        self.open_output_button = QPushButton("Open Output Folder")
+        self.open_output_button = QPushButton("Mở Thư Mục")
         self.open_output_button.clicked.connect(self._open_output_folder)
-        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button = QPushButton("Làm Mới")
         self.refresh_button.clicked.connect(self.refresh_project_data)
         button_row.addWidget(self.preview_button)
         button_row.addWidget(self.build_button)
@@ -190,14 +197,14 @@ class ReleaseCenterPage(QWidget):
 
         results_panel = QWidget()
         results_layout = QVBoxLayout(results_panel)
-        self.results_status_label = QLabel("Preview diagnostics or build a release to see output paths and messages.")
+        self.results_status_label = QLabel("Hãy xem trước chẩn đoán hoặc tiến hành xuất bản để hiển thị các đường dẫn tệp đầu ra.")
         self.results_status_label.setObjectName("mutedLabel")
         self.results_status_label.setWordWrap(True)
         results_layout.addWidget(self.results_status_label)
 
         self.results_view = QTextEdit()
         self.results_view.setReadOnly(True)
-        self.results_view.setPlaceholderText("Release diagnostics, messages, and output paths will appear here.")
+        self.results_view.setPlaceholderText("Các thông số chẩn đoán, đường dẫn tệp sách đã xuất bản và ghi log của Hacker sẽ hiển thị ở đây.")
         results_layout.addWidget(self.results_view, 1)
 
         splitter.addWidget(options_panel)
@@ -239,7 +246,7 @@ class ReleaseCenterPage(QWidget):
     def _browse_output_dir(self) -> None:
         selected = QFileDialog.getExistingDirectory(
             self,
-            "Select Output Folder",
+            "Chọn Thư Mục Đầu Ra",
             self.output_dir_edit.text().strip() or str(Path.cwd()),
         )
         if selected:
@@ -248,7 +255,7 @@ class ReleaseCenterPage(QWidget):
     def _browse_css_files(self) -> None:
         selected, _ = QFileDialog.getOpenFileNames(
             self,
-            "Select CSS Files",
+            "Chọn Các Tệp CSS",
             str(Path.cwd()),
             "CSS Files (*.css);;All Files (*.*)",
         )
@@ -258,7 +265,7 @@ class ReleaseCenterPage(QWidget):
     def _browse_cover(self) -> None:
         selected, _ = QFileDialog.getOpenFileName(
             self,
-            "Select Cover Image",
+            "Chọn Ảnh Bìa",
             str(Path.cwd()),
             "Images (*.jpg *.jpeg *.png);;All Files (*.*)",
         )
@@ -290,23 +297,25 @@ class ReleaseCenterPage(QWidget):
             self._set_busy(True)
             _chapters, diagnostics = self.release_service.build_volume_json(
                 volume,
-                self.translation_source_combo.currentText().strip(),
+                self._selected_translation_source(),
             )
         except Exception as exc:
-            self._show_error("Preview Diagnostics Failed", exc)
+            self._show_error("Xem Trước Chẩn Đoán Thất Bại", exc)
             return
         finally:
             self._set_busy(False)
 
-        warning = "No translated segments were found for this volume." if diagnostics.translated_segments == 0 else ""
+        warning = "Không tìm thấy phân đoạn dịch nào cho tập truyện này." if diagnostics.translated_segments == 0 else ""
+        
+        source_mode_vi = "Ưu tiên bản đã sửa" if diagnostics.source_mode == "fixed_if_available" else ("Chỉ bản đã sửa" if diagnostics.source_mode == "fixed_only" else "Chỉ bản nháp")
         self.results_status_label.setText(
-            warning or f"Previewed diagnostics for volume {volume:02d} using {diagnostics.source_mode}."
+            warning or f"Đã xem trước chẩn đoán cho Tập {volume:02d} bằng chế độ '{source_mode_vi}'."
         )
         self.results_view.setPlainText(self._format_diagnostics_text(diagnostics))
         if warning:
             self.status_message.emit(warning)
         else:
-            self.status_message.emit(f"Previewed release diagnostics for volume {volume:02d}.")
+            self.status_message.emit(f"Đã xem trước chẩn đoán xuất bản cho Tập {volume:02d}.")
 
     def _build_release(self) -> None:
         volume = self._require_volume()
@@ -315,15 +324,15 @@ class ReleaseCenterPage(QWidget):
 
         output_dir = self._selected_output_dir()
         if output_dir is None:
-            self._show_message("Please choose an output folder before building a release.")
+            self._show_message("Vui lòng chọn thư mục đầu ra trước khi xuất bản.")
             return
 
         options = ReleaseOptions(
             volume=volume,
             output_dir=output_dir,
-            translation_source=self.translation_source_combo.currentText().strip(),
+            translation_source=self._selected_translation_source(),
             novel_title=self.novel_title_edit.text().strip(),
-            book_author=self.author_edit.text().strip() or "Unknown",
+            book_author=self.author_edit.text().strip() or "Chưa rõ",
             copy_css=self.copy_css_check.isChecked(),
             css_files=self._selected_css_files(),
             pack_epub=self.pack_epub_check.isChecked(),
@@ -335,16 +344,16 @@ class ReleaseCenterPage(QWidget):
             self._set_busy(True)
             result = self.release_service.build_release(options)
         except Exception as exc:
-            self._show_error("Build Release Failed", exc)
+            self._show_error("Tiến Hành Xuất Bản Thất Bại", exc)
             return
         finally:
             self._set_busy(False)
 
         self.last_build_result = result
-        self.results_status_label.setText(f"Built release outputs for volume {result.volume:02d}.")
+        self.results_status_label.setText(f"Đã xuất bản thành công các tệp đầu ra cho Tập {result.volume:02d}.")
         self.results_view.setPlainText(self._format_build_result_text(result))
         self._update_open_button()
-        self.status_message.emit(f"Built release outputs for volume {result.volume:02d}.")
+        self.status_message.emit(f"Đã xuất bản thành công các tệp đầu ra cho Tập {result.volume:02d}.")
 
     def _open_output_folder(self) -> None:
         path = None
@@ -355,51 +364,52 @@ class ReleaseCenterPage(QWidget):
             if output_dir is not None and output_dir.exists():
                 path = output_dir
         if path is None:
-            self._show_message("The selected output folder does not exist yet.")
+            self._show_message("Thư mục đầu ra được chọn hiện chưa tồn tại.")
             return
         opened = QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
         if not opened:
-            self._show_message(f"Could not open output folder: {path}")
+            self._show_message(f"Không thể mở thư mục đầu ra: {path}")
             return
-        self.status_message.emit(f"Opened output folder: {path}")
+        self.status_message.emit(f"Đã mở thư mục đầu ra: {path}")
 
     def _require_volume(self) -> int | None:
         volume = self._selected_volume()
         if volume is None:
-            self._show_message("Please select a volume first.")
+            self._show_message("Vui lòng chọn một tập truyện trước.")
             return None
         return volume
 
     def _format_diagnostics_text(self, diagnostics: ReleaseDiagnostics) -> str:
+        source_mode_vi = "Ưu tiên bản đã sửa" if diagnostics.source_mode == "fixed_if_available" else ("Chỉ bản đã sửa" if diagnostics.source_mode == "fixed_only" else "Chỉ bản nháp")
         lines = [
-            f"Source mode: {diagnostics.source_mode}",
-            f"Total chapters: {diagnostics.total_chapters}",
-            f"Total segments: {diagnostics.total_segments}",
-            f"Translated segments: {diagnostics.translated_segments}",
-            f"Missing segments: {diagnostics.missing_count}",
+            f"Chế độ nguồn dịch: {source_mode_vi}",
+            f"Tổng số chương: {diagnostics.total_chapters}",
+            f"Tổng số phân đoạn: {diagnostics.total_segments}",
+            f"Phân đoạn đã dịch: {diagnostics.translated_segments}",
+            f"Phân đoạn chưa dịch: {diagnostics.missing_count}",
         ]
         if diagnostics.missing_segments:
             preview = ", ".join(diagnostics.missing_segments[:25])
             if diagnostics.missing_count > len(diagnostics.missing_segments):
                 preview += " ..."
-            lines.append(f"Missing segment ids: {preview}")
+            lines.append(f"Danh sách mã phân đoạn chưa dịch: {preview}")
         return "\n".join(lines)
 
     def _format_build_result_text(self, result: ReleaseBuildResult) -> str:
         lines = [
-            f"Volume: {result.volume:02d}",
+            f"Tập: {result.volume:02d}",
             "",
-            "Output paths:",
-            f"- JSON: {result.volume_json_path}" if result.volume_json_path is not None else "- JSON: none",
-            f"- HTML dir: {result.html_dir}" if result.html_dir is not None else "- HTML dir: none",
-            f"- TOC: {result.toc_path}" if result.toc_path is not None else "- TOC: none",
-            f"- EPUB: {result.epub_path}" if result.epub_path is not None else "- EPUB: none",
-            f"- Manifest: {result.manifest_path}" if result.manifest_path is not None else "- Manifest: none",
+            "Đường dẫn tệp đầu ra:",
+            f"- JSON: {result.volume_json_path}" if result.volume_json_path is not None else "- JSON: không có",
+            f"- Thư mục HTML: {result.html_dir}" if result.html_dir is not None else "- Thư mục HTML: không có",
+            f"- Mục lục (TOC): {result.toc_path}" if result.toc_path is not None else "- Mục lục (TOC): không có",
+            f"- Sách EPUB: {result.epub_path}" if result.epub_path is not None else "- Sách EPUB: không có",
+            f"- Tệp Manifest: {result.manifest_path}" if result.manifest_path is not None else "- Tệp Manifest: không có",
             "",
-            "Diagnostics:",
+            "Thông số chẩn đoán:",
             self._format_diagnostics_text(result.diagnostics),
             "",
-            "Messages:",
+            "Thông điệp ghi nhận:",
         ]
         lines.extend(f"- {message}" for message in result.messages)
         return "\n".join(lines)

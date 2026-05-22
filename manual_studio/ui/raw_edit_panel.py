@@ -32,7 +32,7 @@ class RawEditPanel(QWidget):
         self._loading = False
         self._dirty = False
         self._build_ui()
-        self.clear("Select an editable object to use Raw Edit.")
+        self.clear("Chọn một phân đoạn hoặc mục có thể chỉnh sửa để dùng tính năng JSON Gốc.")
 
     def set_object(self, title: str, obj: dict[str, Any] | list[Any] | None, editable: bool = True) -> None:
         self._load_target(RawEditTarget(title=title, obj=obj, editable=editable), "")
@@ -41,7 +41,7 @@ class RawEditPanel(QWidget):
         self._load_target(target, message)
 
     def clear(self, message: str = "") -> None:
-        self.show_placeholder(message or "Select an editable object to use Raw Edit.")
+        self.show_placeholder(message or "Chọn một phân đoạn hoặc mục có thể chỉnh sửa để dùng tính năng JSON Gốc.")
 
     def has_unapplied_changes(self) -> bool:
         return self._has_unapplied_text()
@@ -55,24 +55,24 @@ class RawEditPanel(QWidget):
     def parsed_json_or_error(self) -> tuple[object | None, str | None]:
         text = self.text_edit.toPlainText().strip()
         if not text:
-            return None, "Raw edit JSON is empty."
+            return None, "Nội dung JSON đang để trống."
         try:
             payload = json.loads(text)
         except Exception as exc:
-            return None, f"Invalid JSON: {exc}"
+            return None, f"Cú pháp JSON không hợp lệ: {exc}"
         expected_is_list = isinstance(self.current_target.obj, list) if self.current_target is not None else False
         if expected_is_list:
             if not isinstance(payload, list):
-                return None, "Expected a JSON array for this selection."
+                return None, "Bối cảnh yêu cầu một mảng JSON (Array) cho lựa chọn này."
         elif not isinstance(payload, dict):
-            return None, "Expected a JSON object for this selection."
+            return None, "Bối cảnh yêu cầu một đối tượng JSON (Object) cho lựa chọn này."
         return payload, None
 
     def show_placeholder(self, message: str) -> None:
         self.current_target = None
         self._loading = True
         try:
-            self.title_label.setText("Raw Edit")
+            self.title_label.setText("Sửa JSON Gốc")
             self.text_edit.setPlainText("")
             self.text_edit.setReadOnly(True)
         finally:
@@ -85,11 +85,11 @@ class RawEditPanel(QWidget):
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        self.title_label = QLabel("Raw Edit")
+        self.title_label = QLabel("Sửa JSON Gốc")
         self.title_label.setObjectName("titleLabel")
         layout.addWidget(self.title_label)
 
-        self.info_label = QLabel("Apply raw JSON to the current in-memory selection. Save in the tab to write artifacts.")
+        self.info_label = QLabel("Áp dụng mã JSON thô trực tiếp vào bối cảnh bộ nhớ hiện tại. Hãy lưu trong Tab tương ứng để ghi dữ liệu.")
         self.info_label.setObjectName("mutedLabel")
         self.info_label.setWordWrap(True)
         layout.addWidget(self.info_label)
@@ -100,12 +100,15 @@ class RawEditPanel(QWidget):
         layout.addWidget(self.status_label)
 
         self.text_edit = QTextEdit()
+        self.text_edit.setStyleSheet("font-family: 'Consolas', monospace; background-color: #0c0d14; border: 1px solid #1f233a;")
         self.text_edit.textChanged.connect(self._on_text_changed)
         layout.addWidget(self.text_edit, 1)
 
-        self.validate_button = QPushButton("Validate JSON")
-        self.apply_button = QPushButton("Apply to Selection")
-        self.reset_button = QPushButton("Reset From Selection")
+        self.validate_button = QPushButton("Kiểm Tra Cú Pháp")
+        self.apply_button = QPushButton("Áp Dụng Cho Phân Đoạn")
+        self.apply_button.setObjectName("aiButton")
+        self.reset_button = QPushButton("Khôi Phục Ban Đầu")
+        self.reset_button.setObjectName("dangerButton")
         self.validate_button.clicked.connect(self._validate_json)
         self.apply_button.clicked.connect(self._apply_json)
         self.reset_button.clicked.connect(self._on_reset_clicked)
@@ -131,7 +134,7 @@ class RawEditPanel(QWidget):
         self._loading = True
         try:
             if target is None:
-                self.title_label.setText("Raw Edit")
+                self.title_label.setText("Sửa JSON Gốc")
                 self.text_edit.setPlainText("")
                 self.text_edit.setReadOnly(True)
                 self._loaded_text = ""
@@ -147,10 +150,10 @@ class RawEditPanel(QWidget):
 
         self._set_dirty(False)
         if target is None:
-            self.status_label.setText(message or "Select an editable object to use Raw Edit.")
+            self.status_label.setText(message or "Chọn một phân đoạn hoặc mục có thể chỉnh sửa để dùng tính năng JSON Gốc.")
         else:
             self.status_label.setText(
-                message or target.message or "Applied changes stay in memory until you use the tab's Save action."
+                message or target.message or "Các thay đổi được áp dụng vào bộ nhớ tạm cho đến khi bạn bấm Lưu trong Tab."
             )
 
     def _on_text_changed(self) -> None:
@@ -159,10 +162,10 @@ class RawEditPanel(QWidget):
         if self.current_target is None:
             return
         if self._has_unapplied_text():
-            self.status_label.setText("Raw JSON changed in memory. Apply or Reset before switching away.")
+            self.status_label.setText("Mã JSON đã bị thay đổi. Vui lòng Áp Dụng hoặc Khôi Phục trước khi chọn mục khác.")
             self._set_dirty(True)
         else:
-            self.status_label.setText("Raw JSON matches the current in-memory selection.")
+            self.status_label.setText("Nội dung JSON khớp hoàn toàn với bối cảnh bộ nhớ hiện tại.")
             self._set_dirty(False)
 
     def _validate_json(self) -> None:
@@ -170,8 +173,8 @@ class RawEditPanel(QWidget):
         if error is not None:
             self.status_label.setText(error)
             return
-        title = self.current_target.title if self.current_target is not None else "selection"
-        self.status_label.setText(f"Valid JSON for {title}.")
+        title = self.current_target.title if self.current_target is not None else "lựa chọn"
+        self.status_label.setText(f"Cú pháp JSON hợp lệ cho {title}.")
 
     def _apply_json(self) -> None:
         payload, error = self.parsed_json_or_error()

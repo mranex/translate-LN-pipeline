@@ -25,7 +25,7 @@ class EditorPage(QWidget):
         self.editor_actions = EditorActionService(placeholder_workspace)
         self.editor_index = EditorIndex(workspace) if workspace is not None else None
         self.current_context: SelectionContext | None = None
-        self.current_selected_id = "No selection"
+        self.current_selected_id = "Chưa chọn"
         self._build_ui()
 
     def set_workspace(self, workspace: Workspace) -> None:
@@ -44,31 +44,31 @@ class EditorPage(QWidget):
         return self.artifact_tabs.has_unsaved_changes()
 
     def set_selection_context(self, context: SelectionContext | None, selected_id: str, prompt_on_dirty: bool = True) -> bool:
-        if prompt_on_dirty and not self._resolve_raw_edit_changes(f"switching to {selected_id}"):
-            self.status_message.emit("Selection change canceled.")
+        if prompt_on_dirty and not self._resolve_raw_edit_changes(f"chuyển sang {selected_id}"):
+            self.status_message.emit("Đã hủy thay đổi phân đoạn.")
             return False
         if prompt_on_dirty and self.current_context is not None and self.artifact_tabs.has_unsaved_changes():
-            if not self.artifact_tabs.resolve_unsaved_changes(self, f"switching to {selected_id}"):
-                self.status_message.emit("Selection change canceled.")
+            if not self.artifact_tabs.resolve_unsaved_changes(self, f"chuyển sang {selected_id}"):
+                self.status_message.emit("Đã hủy thay đổi phân đoạn.")
                 return False
 
         self.current_context = context
         self.current_selected_id = selected_id
-        self.scope_value.setText(context.scope if context is not None else "none")
+        self.scope_value.setText(context.scope if context is not None else "không có")
         self.selected_id_value.setText(selected_id)
         self.refresh_current_view(force=True)
         return True
 
     def refresh_current_view(self, force: bool = False) -> bool:
         if not force and self.artifact_tabs.has_unsaved_changes():
-            self.status_label.setText("Editor has unsaved changes. Background refresh was skipped.")
-            self.status_message.emit("Editor refresh skipped because there are unsaved changes.")
+            self.status_label.setText("Trình soạn thảo có thay đổi chưa lưu. Đã bỏ qua làm mới ngầm.")
+            self.status_message.emit("Đã bỏ qua làm mới trình soạn thảo do có thay đổi chưa lưu.")
             return False
 
         if self.editor_index is None or self.current_context is None:
             self.artifact_tabs.set_snapshot(EditorSnapshot.empty(), None)
-            self.status_label.setText("No Editor selection is available.")
-            self.status_message.emit("Editor is waiting for a selection.")
+            self.status_label.setText("Không có phân đoạn soạn thảo nào khả dụng.")
+            self.status_message.emit("Trình soạn thảo đang chờ chọn phân đoạn.")
             return True
 
         try:
@@ -77,42 +77,48 @@ class EditorPage(QWidget):
             self.artifact_tabs.set_snapshot(EditorSnapshot.empty(), None)
             self.status_label.setText(str(exc))
             self.status_message.emit(str(exc))
-            QMessageBox.critical(self, "Editor Refresh Failed", str(exc))
+            QMessageBox.critical(self, "Làm mới Trình Soạn Thảo thất bại", str(exc))
             return False
 
         self.artifact_tabs.set_snapshot(snapshot, self.current_context)
-        self.status_label.setText("Editor refreshed for the current selection.")
-        self.status_message.emit("Editor refreshed.")
+        self.status_label.setText("Đã làm mới dữ liệu soạn thảo cho phân đoạn hiện tại.")
+        self.status_message.emit("Đã làm mới trình soạn thảo.")
         return True
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
 
         title_row = QHBoxLayout()
-        title = QLabel("Editor")
+        title = QLabel("Trình Soạn Thảo")
         title.setObjectName("titleLabel")
         title_row.addWidget(title)
         title_row.addStretch(1)
-        self.raw_edit_toggle = QPushButton("Raw Edit")
+        self.raw_edit_toggle = QPushButton("Sửa JSON Gốc")
         self.raw_edit_toggle.setCheckable(True)
         self.raw_edit_toggle.toggled.connect(self._on_raw_edit_toggled)
         title_row.addWidget(self.raw_edit_toggle)
-        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button = QPushButton("Làm Mới")
+        self.refresh_button.setObjectName("aiButton")
         self.refresh_button.clicked.connect(self._on_refresh_clicked)
         title_row.addWidget(self.refresh_button)
         layout.addLayout(title_row)
 
-        self.scope_value = QLabel("none")
+        self.scope_value = QLabel("không có")
         self.scope_value.setObjectName("mutedLabel")
-        self.selected_id_value = QLabel("No selection")
+        self.selected_id_value = QLabel("Chưa chọn")
         self.selected_id_value.setObjectName("mutedLabel")
-        layout.addWidget(QLabel("Selected scope"))
-        layout.addWidget(self.scope_value)
-        layout.addWidget(QLabel("Selected ID"))
-        layout.addWidget(self.selected_id_value)
+        
+        info_row = QHBoxLayout()
+        info_row.addWidget(QLabel("Phạm vi đang chọn:"))
+        info_row.addWidget(self.scope_value)
+        info_row.addSpacing(16)
+        info_row.addWidget(QLabel("Mã đang chọn:"))
+        info_row.addWidget(self.selected_id_value)
+        info_row.addStretch(1)
+        layout.addLayout(info_row)
 
         self.status_label = QLabel(
-            "Volume canon, Segment Glossaries, Segment Pronouns, Dialogue Labels, and Translations support editing. Segment Contexts, QA previews, and Raw JSON remain read-only."
+            "Mẹo: Hệ thống hỗ trợ sửa trực tiếp Canon tập truyện, Thuật ngữ phân đoạn, Đại từ nhân vật, Ghi nhãn hội thoại và Bản dịch tiếng Việt. Bối cảnh nền, xem trước QA và JSON thô ở trạng thái chỉ đọc."
         )
         self.status_label.setObjectName("mutedLabel")
         self.status_label.setWordWrap(True)
@@ -132,10 +138,10 @@ class EditorPage(QWidget):
         layout.addWidget(self.editor_splitter, 1)
 
     def _on_refresh_clicked(self) -> None:
-        if not self._resolve_raw_edit_changes("reloading the current editor view"):
+        if not self._resolve_raw_edit_changes("làm mới giao diện soạn thảo hiện tại"):
             return
         if self.artifact_tabs.has_unsaved_changes():
-            if not self.artifact_tabs.resolve_unsaved_changes(self, "reloading the current editor view"):
+            if not self.artifact_tabs.resolve_unsaved_changes(self, "làm mới giao diện soạn thảo hiện tại"):
                 return
         self.refresh_current_view(force=True)
 
@@ -144,7 +150,7 @@ class EditorPage(QWidget):
         self.artifacts_changed.emit()
 
     def _on_raw_edit_toggled(self, checked: bool) -> None:
-        if not checked and not self._resolve_raw_edit_changes("hiding the raw edit panel"):
+        if not checked and not self._resolve_raw_edit_changes("ẩn bảng chỉnh sửa JSON gốc"):
             self.raw_edit_toggle.blockSignals(True)
             self.raw_edit_toggle.setChecked(True)
             self.raw_edit_toggle.blockSignals(False)
@@ -154,17 +160,17 @@ class EditorPage(QWidget):
         if checked:
             self.editor_splitter.setSizes([900, 420])
             self._on_raw_edit_target_changed(*self.artifact_tabs.current_raw_edit_target())
-            self.status_message.emit("Raw edit panel opened.")
+            self.status_message.emit("Đã mở bảng chỉnh sửa JSON gốc.")
         else:
             self.editor_splitter.setSizes([1, 0])
-            self.status_message.emit("Raw edit panel hidden.")
+            self.status_message.emit("Đã ẩn bảng chỉnh sửa JSON gốc.")
 
     def _on_raw_edit_target_changed(self, target, message: str) -> None:
         current_key = self.raw_edit_panel.current_target.selection_key if self.raw_edit_panel.current_target is not None else None
         next_key = target.selection_key if target is not None else None
         if self.raw_edit_toggle.isChecked() and self.raw_edit_panel.has_unapplied_changes() and current_key != next_key:
             self.raw_edit_panel.status_label.setText(
-                "Raw edit has unapplied changes. Apply or Reset before following the new selection."
+                "Thay đổi JSON thô chưa được áp dụng. Vui lòng Áp dụng hoặc Khôi phục trước khi chọn mục khác."
             )
             return
         self.raw_edit_panel.set_target(target, message)
@@ -175,8 +181,8 @@ class EditorPage(QWidget):
     def _on_raw_edit_reset_requested(self) -> None:
         self.raw_edit_panel.reset_from_current()
         target, message = self.artifact_tabs.current_raw_edit_target()
-        self.raw_edit_panel.set_target(target, message or "Reset from the current in-memory selection.")
-        self.status_message.emit("Raw edit reset from the current selection.")
+        self.raw_edit_panel.set_target(target, message or "Khôi phục từ bối cảnh bộ nhớ hiện tại.")
+        self.status_message.emit("Đã khôi phục chỉnh sửa JSON thô.")
 
     def _make_artifact_tabs(self) -> EditorArtifactTabs:
         tabs = EditorArtifactTabs(self.editor_actions, self.workspace)
@@ -207,25 +213,28 @@ class EditorPage(QWidget):
     def _apply_raw_edit_payload(self, payload) -> bool:
         target = self.raw_edit_panel.current_target
         if target is None or target.apply_callback is None:
-            message = "Select an editable object before applying raw JSON."
+            message = "Vui lòng chọn một đối tượng có thể sửa trước khi áp dụng JSON thô."
             self.raw_edit_panel.status_label.setText(message)
             self.status_message.emit(message)
             return False
         try:
             message = target.apply_callback(copy.deepcopy(payload))
         except Exception as exc:
-            QMessageBox.critical(self, "Raw Edit Apply Failed", str(exc))
+            QMessageBox.critical(self, "Áp dụng JSON thô thất bại", str(exc))
             self.status_message.emit(str(exc))
             self.raw_edit_panel.status_label.setText(str(exc))
             return False
 
-        status_message = message or "Applied in memory. Click Save to write artifact."
-        if "Applied raw JSON" not in status_message:
-            status_message = f"Applied raw JSON in memory. {status_message}"
+        status_message = message or "Đã áp dụng vào bộ nhớ tạm. Hãy bấm Lưu để ghi dữ liệu."
+        if "Applied raw JSON" in status_message:
+            status_message = status_message.replace("Applied raw JSON in memory.", "Đã áp dụng JSON thô vào bộ nhớ tạm.")
+        elif "Applied" in status_message:
+            status_message = status_message.replace("Applied", "Đã áp dụng").replace("in memory", "vào bộ nhớ")
+        
         next_target, next_message = self.artifact_tabs.current_raw_edit_target()
         self.raw_edit_panel.set_target(
             next_target,
-            status_message or next_message or "Applied raw JSON in memory. Click Save to write artifact.",
+            status_message or next_message or "Đã áp dụng JSON thô vào bộ nhớ tạm. Hãy bấm Lưu để ghi dữ liệu.",
         )
         self.status_message.emit(status_message)
         return True
@@ -233,9 +242,9 @@ class EditorPage(QWidget):
     def _raw_edit_choice(self, reason: str) -> QMessageBox.StandardButton:
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Icon.Warning)
-        box.setWindowTitle("Raw Edit Changes")
-        box.setText("Raw Edit has unapplied changes.")
-        box.setInformativeText(f"What would you like to do before {reason}?")
+        box.setWindowTitle("Thay Đổi JSON Thô Chưa Lưu")
+        box.setText("Có một số thay đổi JSON thô chưa được áp dụng.")
+        box.setInformativeText(f"Bạn muốn thực hiện thao tác nào trước khi {reason}?")
         box.setStandardButtons(
             QMessageBox.StandardButton.Apply
             | QMessageBox.StandardButton.Discard

@@ -24,7 +24,7 @@ class MainWindow(QMainWindow):
         self.current_selection: dict | None = None
         self.current_context: SelectionContext | None = None
 
-        self.setWindowTitle("Manual Studio v3")
+        self.setWindowTitle("Manual Studio v3 - Buồng Lái Dịch Thuật")
         self.resize(1440, 920)
         self._build_ui()
         self._load_workspace()
@@ -52,11 +52,11 @@ class MainWindow(QMainWindow):
         self.release_page.status_message.connect(self.statusBar().showMessage)
 
         self.workspace_tabs = QTabWidget()
-        self.workspace_tabs.addTab(self.prompt_page, "Prompt Studio")
-        self.workspace_tabs.addTab(self.editor_page, "Editor")
-        self.workspace_tabs.addTab(self.progress_page, "Project Progress")
-        self.workspace_tabs.addTab(self.series_canon_page, "Series Canon")
-        self.workspace_tabs.addTab(self.release_page, "Release Center")
+        self.workspace_tabs.addTab(self.prompt_page, "Phòng Prompt AI")
+        self.workspace_tabs.addTab(self.editor_page, "Trình Soạn Thảo")
+        self.workspace_tabs.addTab(self.progress_page, "Tiến Độ Dự Án")
+        self.workspace_tabs.addTab(self.series_canon_page, "Thư Viện Canon")
+        self.workspace_tabs.addTab(self.release_page, "Trạm Xuất Bản")
 
         splitter.addWidget(self.navigation_panel)
         splitter.addWidget(self.workspace_tabs)
@@ -67,19 +67,19 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         self.project_status = QLabel()
-        self.selection_status = QLabel("No selection")
+        self.selection_status = QLabel("Chưa chọn phân đoạn")
         self.statusBar().addPermanentWidget(self.project_status)
         self.statusBar().addPermanentWidget(self.selection_status, 1)
-        self.project_status.setText(f"Project: {self.project_name} ({self.repo_root})")
+        self.project_status.setText(f"Dự án: {self.project_name} ({self.repo_root})")
 
     def _load_workspace(self) -> None:
         try:
             self.navigation_panel.set_workspace(self.workspace)
         except Exception as exc:
-            QMessageBox.critical(self, "Manual Studio v3", f"Failed to load project:\n{exc}")
-            self.prompt_page.set_selection_context(None, "Project load failed")
-            self.editor_page.set_selection_context(None, "Project load failed", prompt_on_dirty=False)
-            self.progress_page.set_selection_context(None, "Project load failed")
+            QMessageBox.critical(self, "Manual Studio v3", f"Tải dự án thất bại:\n{exc}")
+            self.prompt_page.set_selection_context(None, "Tải dự án thất bại")
+            self.editor_page.set_selection_context(None, "Tải dự án thất bại", prompt_on_dirty=False)
+            self.progress_page.set_selection_context(None, "Tải dự án thất bại")
             self.series_canon_page.set_selection_context(None)
             self.release_page.set_selection_context(None)
 
@@ -88,12 +88,12 @@ class MainWindow(QMainWindow):
             next_context, selected_id = self._selection_context_from_payload(selection)
         except ValueError as exc:
             QMessageBox.critical(self, "Manual Studio v3", str(exc))
-            self.prompt_page.set_selection_context(None, "Invalid selection")
-            self.editor_page.set_selection_context(None, "Invalid selection", prompt_on_dirty=False)
-            self.progress_page.set_selection_context(None, "Invalid selection")
+            self.prompt_page.set_selection_context(None, "Lựa chọn không hợp lệ")
+            self.editor_page.set_selection_context(None, "Lựa chọn không hợp lệ", prompt_on_dirty=False)
+            self.progress_page.set_selection_context(None, "Lựa chọn không hợp lệ")
             self.series_canon_page.set_selection_context(None)
             self.release_page.set_selection_context(None)
-            self.selection_status.setText("Invalid selection")
+            self.selection_status.setText("Lựa chọn không hợp lệ")
             return
 
         if not self.editor_page.set_selection_context(next_context, selected_id, prompt_on_dirty=True):
@@ -118,7 +118,7 @@ class MainWindow(QMainWindow):
 
     def _open_series_canon_from_editor(self, canon_kind: str, entry_obj: object, volume: int) -> None:
         if not isinstance(entry_obj, dict):
-            self.statusBar().showMessage("Select a canon entry before opening it in Series Canon.")
+            self.statusBar().showMessage("Hãy chọn một mục canon trước khi mở trong Thư viện Canon.")
             return
 
         self.workspace_tabs.setCurrentWidget(self.series_canon_page)
@@ -127,27 +127,27 @@ class MainWindow(QMainWindow):
         elif canon_kind == "relationships":
             focused = self.series_canon_page.focus_relationship_entry(volume, entry_obj)
         else:
-            self.statusBar().showMessage(f"Unsupported Series Canon target: {canon_kind}")
+            self.statusBar().showMessage(f"Đối tượng Series Canon không được hỗ trợ: {canon_kind}")
             return
 
         if not focused:
-            self.statusBar().showMessage("No matching Series Canon entry was found for the selected editor row.")
+            self.statusBar().showMessage("Không tìm thấy mục Series Canon tương ứng cho hàng soạn thảo đã chọn.")
 
     def _update_selection_status(self) -> None:
         if self.current_context is None:
-            self.selection_status.setText("No selection")
+            self.selection_status.setText("Chưa chọn phân đoạn")
             return
 
         scope = self.current_context.scope
         volume = self.current_context.volume
         if scope == "volume":
-            status_text = f"Selected volume {volume:02d}"
+            status_text = f"Đang chọn tập {volume:02d}"
         elif scope == "chapter":
-            status_text = f"Selected volume {volume:02d}, chapter {self.current_selected_id()}"
+            status_text = f"Đang chọn tập {volume:02d}, chương {self.current_selected_id()}"
         elif scope == "segment":
-            status_text = f"Selected volume {volume:02d}, segment {self.current_context.segment}"
+            status_text = f"Đang chọn tập {volume:02d}, phân đoạn {self.current_context.segment}"
         else:
-            status_text = "Unsupported selection"
+            status_text = "Không hỗ trợ lựa chọn này"
         self.selection_status.setText(status_text)
 
     def current_selected_id(self) -> str:
