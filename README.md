@@ -20,9 +20,17 @@ Không giống như các công cụ dịch thuật tự động một nút bấm
 
 ---
 
+## 📸 Giao Diện Thực Tế (Visual Showcase)
+
+| 🤖 Phòng Prompt AI | 📝 Trình Soạn Thảo |
+| :---: | :---: |
+| ![Phòng Prompt AI](Screenshot/Prompt_studio.PNG) | ![Trình Soạn Thảo](Screenshot/Editor.PNG) |
+
+---
+
 ## 🧭 Các Trụ Cột Trong Buồng Lái
 
-Giao diện chính được xây dựng bằng **PyQt6** với thiết kế màu đêm tối Cyberpunk tuyệt đẹp, giảm mỏi mắt khi dịch giả làm việc lúc 2 giờ sáng.
+Giao diện chính được xây dựng bằng **PyQt6** với thiết kế màu đêm tối Cyberpunk tuyệt đẹp, giảm mỏi mắt khi dịch giả làm việc lúc 2 giờ sáng. Đã được trang bị **App Icon Cyberpunk Wibu Cockpit độc quyền** cực chất.
 
 ### 1. Cây Điều Hướng Cấp Độ (Navigation Panel)
 Cây điều hướng lề trái là xương sống của mọi thao tác và điều khiển ngữ cảnh (Context) của toàn bộ ứng dụng:

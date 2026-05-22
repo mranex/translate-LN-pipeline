@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QLabel, QMainWindow, QMessageBox, QSplitter, QTabWidget, QWidget, QVBoxLayout
 
 from manual_studio.core.manual_workflow import ManualWorkflowService, SelectionContext
@@ -25,6 +26,11 @@ class MainWindow(QMainWindow):
         self.current_context: SelectionContext | None = None
 
         self.setWindowTitle("Manual Studio v3 - Buồng Lái Dịch Thuật")
+        
+        icon_path = Path(__file__).parent / "app_icon.png"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
+            
         self.resize(1440, 920)
         self._build_ui()
         self._load_workspace()
