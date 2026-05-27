@@ -11,6 +11,14 @@ from .editor_actions import (
 from .editor_index import ArtifactView, EditorIndex, EditorRow, EditorSnapshot
 from .manual_workflow import ImportResult, LocalActionResult, ManualWorkflowService, PromptBuildResult, SelectionContext
 from .progress import ProgressService, StepProgress
+from .project_bootstrap import (
+    LEVEL_STEPS,
+    PROJECT_SCAFFOLD_DIRS,
+    ProjectBootstrapError,
+    build_project_config,
+    create_project,
+    normalize_level,
+)
 from .project_index import ProjectIndex
 from .prompt_engine import PromptEngine
 from .release_service import ReleaseBuildResult, ReleaseDiagnostics, ReleaseOptions, ReleaseService
@@ -34,7 +42,9 @@ __all__ = [
     "ProgressService",
     "PromptBuildResult",
     "ProjectIndex",
+    "ProjectBootstrapError",
     "PromptEngine",
+    "PROJECT_SCAFFOLD_DIRS",
     "ReleaseBuildResult",
     "ReleaseDiagnostics",
     "ReleaseOptions",
@@ -51,10 +61,14 @@ __all__ = [
     "SyncReport",
     "SelectionContext",
     "SegmentEditLoadResult",
+    "LEVEL_STEPS",
     "TranslationBundle",
     "TranslationTextRef",
     "Workspace",
     "ActiveCanonResult",
+    "build_project_config",
+    "create_project",
+    "normalize_level",
     "parse_json_response",
     "steps_for_scope",
     "strip_fences",

@@ -37,3 +37,5 @@ venv.bak/
 # Data
 data/
 tests/
+dist/
+build_exe.bat

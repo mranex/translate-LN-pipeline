@@ -7,6 +7,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk, simpledialog
 from tkinter.scrolledtext import ScrolledText
 
+from manual_studio.core.project_bootstrap import ProjectBootstrapError, create_project
+
 APP='Manual Prompt Studio v2'
 D={'bg':'#14161b','p':'#282c37','e':'#101217','fg':'#e8eaf0','m':'#a7adba','a':'#7db1ff','s':'#33415c','b':'#3a4050','d':'#57313a','ok':'#2f5132'}
 
@@ -651,20 +653,20 @@ class StartupApp(tk.Tk):
         self.selected_project = val
         self.destroy()
     def create_proj(self):
-        name = self.new_name.get().strip()
-        if not name: messagebox.showerror('Error', 'Project Name is required'); return
-        if name in ('source', 'segments'): messagebox.showerror('Error', 'Invalid Project Name'); return
-        lvl = self.new_level.get()
-        steps = []
-        if lvl == 'Heavy':
-            steps = ['extract_chapter_glossary', 'merge_volume_glossary', 'review_volume_glossary', 'extract_chapter_relationships', 'merge_volume_relationships', 'review_volume_relationships', 'build_segment_glossary', 'review_segment_glossary', 'build_segment_pronouns', 'review_segment_pronouns', 'build_segment_context', 'label_dialogue', 'translate', 'qa', 'fix', 'assemble']
-        else: # Medium / Lite
-            steps = ['extract_chapter_glossary', 'merge_volume_glossary', 'review_volume_glossary', 'extract_chapter_relationships', 'merge_volume_relationships', 'review_volume_relationships', 'label_dialogue', 'translate', 'assemble']
-        cfg = {'name': name, 'genre': self.new_genre.get().strip(), 'level': lvl, 'enabled_steps': steps}
-        cfg_path = self.root_dir.joinpath('data', name, 'project_config.json')
-        cfg_path.parent.mkdir(parents=True, exist_ok=True)
-        write_json(cfg_path, cfg)
-        self.selected_project = name
+        try:
+            project_root = create_project(
+                self.root_dir,
+                self.new_name.get(),
+                self.new_genre.get(),
+                self.new_level.get(),
+            )
+        except ProjectBootstrapError as exc:
+            messagebox.showerror('Error', str(exc))
+            return
+        except OSError as exc:
+            messagebox.showerror('Error', f'Failed to create project files: {exc}')
+            return
+        self.selected_project = project_root.name
         self.destroy()
 
 def main():
